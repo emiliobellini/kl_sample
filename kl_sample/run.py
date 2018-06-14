@@ -8,6 +8,7 @@ single point (single_point).
 """
 
 import io
+import cosmo
 import checks
 
 
@@ -36,7 +37,8 @@ def run(args):
 
     # Create array with cosmo parameters
     cosmo_names  = ['h', 'omega_c', 'omega_b', 'ln10_A_s', 'n_s']
-    cosmo_params = io.get_cosmo_array(path['params'], cosmo_names)
+    cosmo_params = cosmo.get_cosmo_array(path['params'], cosmo_names)
+    cosmo_mask = cosmo.get_cosmo_mask(cosmo_params)
 
 
     # Read and store the remaining parameters
@@ -44,7 +46,7 @@ def run(args):
         'sampler' : io.get_param(path['params'], 'sampler'),
         'space' : io.get_param(path['params'], 'space'),
         'method' : io.get_param(path['params'], 'method'),
-        'ell_max' : io.get_param(path['params'], 'ell_max'),
+        'ell_max' : io.get_param(path['params'], 'ell_max', type='int'),
         'n_sims' : io.get_param(path['params'], 'n_sims'),
     }
     # Sampler settings
@@ -69,6 +71,7 @@ def run(args):
     print path
     print cosmo_params
     print cosmo_names
+    print cosmo_mask
     print settings
 
     return

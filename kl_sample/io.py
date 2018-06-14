@@ -159,37 +159,3 @@ def get_param(fname, par, type='string'):
     # All other types (such as strings) will be returned as strings
     else:
         return value
-
-
-
-def get_cosmo_array(fname, pars):
-    """ Read from the parameter file the cosmological
-        parameters and store them in an array.
-
-    Args:
-        fname: path of the input file.
-        pars: list of the cosmological parameters. Used
-        to determine the order in which they are stored
-
-    Returns:
-        cosmo_pars: array containing the cosmological
-        parameters. Each parameter is a row as
-        [left_bound, central, right_bound].
-
-    """
-
-    # Initialize the array
-    cosmo_params = []
-    # Run over the parameters and append them
-    # to the array
-    for n, par in enumerate(pars):
-        # Get the values of the parameter
-        value = get_param(fname, par, type='cosmo')
-        # Check that the parameter has the correct shape and
-        # it is not a string
-        if len(value)==3 and type(value) is not str:
-            cosmo_params.append(value)
-        else:
-            raise IOError('Check the value of ' + par + '!')
-
-    return np.array(cosmo_params)

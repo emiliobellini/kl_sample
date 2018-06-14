@@ -14,7 +14,7 @@ c - run: given the data (either in real or fourier space)
 """
 
 import sys
-from tools.io import argument_parser
+from kl_sample.io import argument_parser
 
 # -----------------MAIN-CALL-----------------------------------------
 if __name__ == '__main__':

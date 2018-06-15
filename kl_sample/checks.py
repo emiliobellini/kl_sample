@@ -7,18 +7,15 @@ to ensure that the input is consistent.
 
 from astropy.io import fits
 
-import cosmo
 
 
-
-def sanity_checks(cosmo_params, cosmo_names, settings, path):
+def sanity_checks(cosmo, settings, path):
     """ Perform different sanity checks on the input
         parameters and data.
 
     Args:
-        cosmo_params: array with the cosmological parameters
-        cosmo_names: array with the names of the cosmological
-        parameters
+        cosmo: dictionary containing names, values and mask for
+        the cosmological parameters
         settings: dictionary with all the settings used
         path: dictionary containing the paths stored
 
@@ -38,16 +35,16 @@ def sanity_checks(cosmo_params, cosmo_names, settings, path):
         return False
 
     # Checks on cosmological parameters
-    for n, par in enumerate(cosmo_params):
+    for n, par in enumerate(cosmo['params']):
         # Check that the central value is a number
         test = par[1] is not None
-        assert test, 'Central value for ' + cosmo_names[n] + ' is None!'
+        assert test, 'Central value for ' + cosmo['names'][n] + ' is None!'
         # Check that the left bound is either None or smaller than central
         test = par[0] is None or par[0]<=par[1]
-        assert test, 'Central value for ' + cosmo_names[n] + ' is lower than the left bound!'
+        assert test, 'Central value for ' + cosmo['names'][n] + ' is lower than the left bound!'
         # Check that the right bound is either None or larger than central
         test = par[2] is None or par[1]<=par[2]
-        assert test, 'Central value for ' + cosmo_names[n] + ' is larger than the right bound!'
+        assert test, 'Central value for ' + cosmo['names'][n] + ' is larger than the right bound!'
 
     # Check sampler options
     test = settings['sampler'] in ['emcee', 'fisher', 'single_point']
@@ -68,8 +65,7 @@ def sanity_checks(cosmo_params, cosmo_names, settings, path):
     # Checks related to the emcee sampler
     if settings['sampler'] == 'emcee':
         # Check that there are at least 2 varying parameters
-        mask = cosmo.get_cosmo_mask(cosmo_params)
-        test = len(mask[mask])>1
+        test = len(cosmo['mask'][cosmo['mask']])>1
         assert test, 'For emcee the minimum number of varied parameters is 2!'
         # Check n_walkers
         test = settings['n_walkers']>0

@@ -8,7 +8,7 @@ single point (single_point).
 """
 
 import io
-import cosmo
+import cosmo as cosmo_tools
 import checks
 
 
@@ -36,9 +36,10 @@ def run(args):
 
 
     # Create array with cosmo parameters
-    cosmo_names  = ['h', 'omega_c', 'omega_b', 'ln10_A_s', 'n_s']
-    cosmo_params = cosmo.get_cosmo_array(path['params'], cosmo_names)
-    cosmo_mask = cosmo.get_cosmo_mask(cosmo_params)
+    cosmo = {}
+    cosmo['names']  = ['h', 'omega_c', 'omega_b', 'ln10_A_s', 'n_s']
+    cosmo['params'] = cosmo_tools.get_cosmo_array(path['params'], cosmo['names'])
+    cosmo['mask']   = cosmo_tools.get_cosmo_mask(cosmo['params'])
 
 
     # Read and store the remaining parameters
@@ -65,20 +66,21 @@ def run(args):
 
 
     # Perform sanity checks on the parameters and data file
-    checks.sanity_checks(cosmo_params, cosmo_names, settings, path)
+    checks.sanity_checks(cosmo, settings, path)
+
+
+    # Read data
 
 
     print path
-    print cosmo_params
-    print cosmo_names
-    print cosmo_mask
+    print cosmo['params']
+    print cosmo['names']
+    print cosmo['mask']
     print settings
 
     return
 # Initialize
-# - Read parameters
 # - Read data
-# - Sanity checks
 
 
 # Preliminary calculations

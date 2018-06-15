@@ -10,6 +10,7 @@ single point (single_point).
 import io
 import cosmo as cosmo_tools
 import checks
+import likelihood as lkl
 
 
 def run(args):
@@ -88,7 +89,21 @@ def run(args):
         raise ValueError('Fourier space not implemented yet!')
 
 
-    # print data
+    # Add some dimension to settings (n_bins, n_x_var)
+    settings['n_bins'] = len(data['photo_z']) - 1
+    settings['n_x_var'] = len(data['x_var'])
+
+
+    # Compute how many simulations have to be used
+    settings['n_sims'] = lkl.how_many_sims(settings, data)
+
+
+    # If required, compute the KL transform
+    if settings['method'] in ['kl_off_diag', 'kl_diag']:
+        data['kl_t'] = lkl.compute_kl(settings, cosmo, data)
+
+
+    # print data['kl_t']
     # print path
     # print cosmo
     # print settings
@@ -96,7 +111,6 @@ def run(args):
     return
 
 # Preliminary calculations
-# - Compute how many simulations
 # - Compute KL transform (conditional)
 # - Apply KL transform
 # - Compute inverse cov_mat

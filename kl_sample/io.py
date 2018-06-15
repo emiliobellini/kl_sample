@@ -134,6 +134,7 @@ def get_param(fname, par, type='string'):
     if value is None:
         value = set.default_params[par]
         print('Default value used for ' + par + ' = ' + str(value))
+        sys.stdout.flush()
 
     # Convert the parameter to the desired type
     if type == 'float':

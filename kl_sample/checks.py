@@ -6,6 +6,7 @@ to ensure that the input is consistent.
 """
 
 import re
+import sys
 import numpy as np
 
 from astropy.io import fits
@@ -38,6 +39,7 @@ def unused_params(cosmo, settings, path):
                 name = name.strip()
                 if name not in params:
                     print('Unused parameter: ' + line)
+                    sys.stdout.flush()
     return
 
 

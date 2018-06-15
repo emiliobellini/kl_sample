@@ -17,7 +17,7 @@ default_params = {
     'n_walkers'     : 10,
     'n_steps'       : 2,
     'space'         : 'real',
-    'data_file'     : 'data/data_real.fits',
+    'data'          : 'data/data_real.fits',
     'output'        : 'output/test/test.txt',
     'n_threads'     : 2
 }

@@ -28,7 +28,7 @@ def run(args):
     # Define absolute paths and check the existence of each required file
     path = {
         'params'  : io.file_exists_or_error(args.params_file),
-        'data'    : io.get_param(args.params_file, 'data_file', type='path'),
+        'data'    : io.get_param(args.params_file, 'data', type='path'),
         'output'  : io.get_param(args.params_file, 'output', type='path')
     }
     io.file_exists_or_error(path['data'])
@@ -65,23 +65,35 @@ def run(args):
         settings['kl_scale_dep'] = io.get_param(path['params'], 'kl_scale_dep', type='bool')
 
 
+    # Check if there are unused parameters.
+    checks.unused_params(cosmo, settings, path)
+
+
     # Perform sanity checks on the parameters and data file
     checks.sanity_checks(cosmo, settings, path)
 
 
     # Read data
+    data = {
+        'photo_z' : io.get_data_from_fits(path['data'], 'photo_z'),
+        'n_eff'   : io.get_data_from_fits(path['data'], 'n_eff'),
+        'sigma_g' : io.get_data_from_fits(path['data'], 'sigma_g')
+    }
+    if settings['space']=='real':
+        data['x_var'] = io.get_data_from_fits(path['data'], 'theta')
+        data['mask_x_var'] = io.get_data_from_fits(path['data'], 'mask_theta').astype(bool)
+        data['corr_obs'] = io.get_data_from_fits(path['data'], 'xipm_obs')
+        data['corr_sim'] = io.get_data_from_fits(path['data'], 'xipm_sim')
+    elif settings['space']=='fourier':
+        raise ValueError('Fourier space not implemented yet!')
 
 
-    print path
-    print cosmo['params']
-    print cosmo['names']
-    print cosmo['mask']
-    print settings
+    # print data
+    # print path
+    # print cosmo
+    # print settings
 
     return
-# Initialize
-# - Read data
-
 
 # Preliminary calculations
 # - Compute how many simulations

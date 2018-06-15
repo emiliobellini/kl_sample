@@ -8,6 +8,7 @@ import argparse
 import os
 import re
 import numpy as np
+from astropy.io import fits
 
 import settings as set
 
@@ -113,6 +114,7 @@ def get_param(fname, par, type='string'):
 
     # Read the file looking for the parameter
     value = None
+    n_par = 0
     with open(fname) as fn:
         for line in fn:
             line = re.sub('#.+', '', line)
@@ -120,12 +122,18 @@ def get_param(fname, par, type='string'):
                 name , _ = line.split('=')
                 name = name.strip()
                 if name == par:
+                    n_par = n_par + 1
                     _ , value = line.split('=')
                     value = value.strip()
+
+    # If there are duplicated parameters raise an error
+    if n_par>1:
+        raise IOError('Found duplicated parameter: ' + par)
 
     # If par was not in the file use the default value
     if value is None:
         value = set.default_params[par]
+        print('Default value used for ' + par + ' = ' + str(value))
 
     # Convert the parameter to the desired type
     if type == 'float':
@@ -159,3 +167,18 @@ def get_param(fname, par, type='string'):
     # All other types (such as strings) will be returned as strings
     else:
         return value
+
+
+def get_data_from_fits(fname, dname):
+    """ Open a fits file and read data from it.
+
+    Args:
+        fname: path of the data file.
+        dname: name of the data we want to extract.
+
+    Returns:
+        array with data for dname.
+
+    """
+    with fits.open(fname) as fn:
+        return fn[dname].data

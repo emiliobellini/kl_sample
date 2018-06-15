@@ -5,8 +5,40 @@ to ensure that the input is consistent.
 
 """
 
+import re
+import numpy as np
+
 from astropy.io import fits
 
+
+def unused_params(cosmo, settings, path):
+    """ Check if there are unused.
+        In case it prints the parameter on the screen.
+
+    Args:
+        cosmo: dictionary containing names, values and mask for
+        the cosmological parameters
+        settings: dictionary with all the settings used
+        path: dictionary containing the paths stored
+
+    Returns:
+        None if there are no unused parameters.
+
+    """
+
+    # Join together all the parameters read
+    params = np.hstack((cosmo['names'], settings.keys(), path.keys()))
+
+    # Scroll all the parameter to see if there are unused ones
+    with open(path['params']) as fn:
+        for line in fn:
+            line = re.sub('#.+', '', line)
+            if '=' in line:
+                name , _ = line.split('=')
+                name = name.strip()
+                if name not in params:
+                    print('Unused parameter: ' + line)
+    return
 
 
 def sanity_checks(cosmo, settings, path):

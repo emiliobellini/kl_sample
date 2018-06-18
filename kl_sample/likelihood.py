@@ -8,6 +8,7 @@ used to compute the likelihood.
 
 import numpy as np
 import math
+import random
 
 import cosmo as cosmo_tools
 import checks
@@ -42,11 +43,13 @@ def how_many_sims(settings, data):
         tot_data = n_x_var*n_bins*(n_bins+1)/2
         # Ratio to be kept fixed
         ratio = (tot_sims-tot_data-2.)/(tot_sims-1.)
-        # Number of kl modes considered
-        n_kl = settings['n_kl']
         if settings['method']=='kl_off_diag':
+            # Number of kl modes considered
+            n_kl = settings['n_kl']
             tot_data = n_x_var*n_kl*(n_kl+1)/2
         elif settings['method']=='kl_diag':
+            # Number of kl modes considered
+            n_kl = settings['n_kl']
             tot_data = n_x_var*n_kl
         return int(round((2.+tot_data-ratio)/(1.-ratio)))
     else:
@@ -98,7 +101,7 @@ def compute_kl(settings, cosmo, data):
     # Test if the transformation matrix gives the correct new Cl's
     checks.kl_consistent(E, S, N, L, eigval, 1.e-12)
 
-    # Return either the scale dependent or independent KL transorm
+    # Return either the scale dependent or independent KL transform
     if settings['kl_scale_dep']:
         return E
     else:
@@ -111,6 +114,76 @@ def compute_kl(settings, cosmo, data):
         return E_avg
 
 
-    # var = cosmo['params'][:,1][cosmo['mask']]
-    # cosmo_tools.get_theory(var, settings, cosmo, data)
-    return
+
+def apply_kl(kl_t, corr):
+    """ Apply the KL transform to the correlation function.
+
+    Args:
+        kl_t: KL transform.
+        corr: correlation function
+
+    Returns:
+        KL transformed correlation function.
+
+    """
+
+    # TODO: here I am assuming real space and kl not scale dependent
+    corr_kl = kl_t.dot(corr).dot(kl_t.T)
+    return np.transpose(corr_kl, axes=[1, 2, 0, 3])
+
+
+
+def reshape_corr(corr, settings, mask):
+    """ Reshape the correlation function.
+
+    Args:
+        corr: correlation function
+        settings: dictionary with settings
+
+    Returns:
+        reshaped correlation function.
+
+    """
+
+    data_r = corr.reshape(
+        (2*settings['n_x_var'],settings['n_bins'],settings['n_bins'])
+        )
+    data_r = np.triu(data_r[mask.flatten()])
+    if settings['method'] in ['kl_off_diag', 'kl_diag']:
+        data_r = data_r[:,:settings['n_kl'],:settings['n_kl']]
+        if settings['method'] == 'kl_diag':
+            data_r = np.diagonal(data_r,  axis1=1, axis2=2)
+    data_r = np.transpose(data_r, axes=[1,2,0])
+    data_r = data_r.flatten()
+    data_r = data_r[data_r != 0]
+
+    return data_r
+
+
+
+def compute_covmat(data, settings):
+    """ Compute covariance matrix and its inverse.
+
+    Args:
+        data: dictionary containing the data stored
+        settings: dictionary with all the settings used
+
+    Returns:
+        array with the inverse covariance matrix.
+
+    """
+
+    # Local variables
+    n_sims = settings['n_sims']
+    n_data = data['corr_sim'].shape[1]
+    # Select simulations
+    rnd = random.sample(range(len(data['corr_sim'])), settings['n_sims'])
+    sims = np.array([data['corr_sim'][x] for x in rnd])
+
+    # Compute covariance matrix
+    cov_mat = np.cov(sims.T)
+
+    # Compute inverse
+    inv_cov_mat = (n_sims-n_data-2.)/(n_sims-1.)*np.linalg.inv(cov_mat)
+
+    return cov_mat, inv_cov_mat

@@ -101,6 +101,7 @@ def run(args):
     # If required, compute the KL transform
     if settings['method'] in ['kl_off_diag', 'kl_diag']:
         data['kl_t'] = lkl.compute_kl(settings, cosmo, data)
+        print data['kl_t'].shape
 
 
     # print data['kl_t']

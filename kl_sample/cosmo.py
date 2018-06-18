@@ -23,7 +23,7 @@ def get_cosmo_array(fname, pars):
         to determine the order in which they are stored
 
     Returns:
-        cosmo_pars: array containing the cosmological
+        cosmo_params: array containing the cosmological
         parameters. Each parameter is a row as
         [left_bound, central, right_bound].
 
@@ -72,67 +72,88 @@ def get_cosmo_mask(params):
 
 
 
-#Construct full array of cosmological parameters
-def get_cosmo(var, cosmo):
-    """ Build an array with the full cosmological
-        parameters.
+def get_cls(cosmo_params, pz, ell_max):
+    """ Get theory Cl's.
 
     Args:
-        var: array containing the varying cosmo parameters.
-        cosmo: dictionary containing cosmology names,
-        values and mask
+        cosmo_params: array with cosmological parameters.
+        pz: probability distribution for each redshift bin.
+        ell_max: maximum multipole.
 
     Returns:
-        array with full cosmological parameters.
+        array with Cl's.
+        cosmo object from CCL.
 
     """
 
-    # Array with initial parameters
-    params = cosmo['params'][:,1]
+    # Local variables
+    n_bins = len(pz)-1
+    n_ells = ell_max+1
 
-    # Substitute all the varying parameters
-    count1 = 0
-    for count2 in range(len(params)):
-        if cosmo['mask'][count2]:
-            params[count2] = var[count1]
-            count1 = count1 + 1
-
-    return params
-
-
-
-def get_theory(var, settings, cosmo):
-    """ Get theory correlation function or Cl's.
-
-    Args:
-        var: array containing the varying cosmo parameters.
-        settings: dictionary with all the settings used
-        cosmo: dictionary containing cosmology names,
-        values and mask
-
-    Returns:
-        array with correlation function or Cl's.
-
-    """
-    #Get cosmological parameters
-    var_tot = get_cosmo(var, cosmo)
-    #Cosmology
-    cosmo_ccl = ccl.Cosmology(
-        h        = var_tot[0],
-        Omega_c  = var_tot[1]/var_tot[0]**2.,
-        Omega_b  = var_tot[2]/var_tot[0]**2.,
-        A_s      = (10.**(-10.))*np.exp(var_tot[3]),
-        n_s      = var_tot[4]
+    # Cosmology
+    cosmo = ccl.Cosmology(
+        h        = cosmo_params[0],
+        Omega_c  = cosmo_params[1]/cosmo_params[0]**2.,
+        Omega_b  = cosmo_params[2]/cosmo_params[0]**2.,
+        A_s      = (10.**(-10.))*np.exp(cosmo_params[3]),
+        n_s      = cosmo_params[4]
         )
-    #Tracers
-    # lens = np.array([ccl.ClTracerLensing(cosmo_ccl, False, z=z.astype(np.float64), n=pz[x].astype(np.float64)) for x in range(n_bins)])
-    # #Cl's
-    # ell = np.arange(n_ells)
-    # cls = np.zeros((n_bins, n_bins, n_ells))
-    # for count1 in range(n_bins):
-    #     for count2 in range(n_bins):
-    #         cls[count1,count2] = ccl.angular_cl(cosmo, lens[count1], lens[count2], ell)
-    # cls = np.transpose(cls,axes=[2,0,1])
+
+    # Tracers
+    lens = np.array([
+        ccl.ClTracerLensing(
+            cosmo,
+            False,
+            z=pz[0].astype(np.float64),
+            n=pz[1:][x].astype(np.float64)
+        ) for x in range(n_bins)])
+
+    # Cl's
+    ell = np.arange(n_ells)
+    cls = np.zeros((n_bins, n_bins, n_ells))
+    for count1 in range(n_bins):
+        for count2 in range(count1,n_bins):
+            cls[count1,count2] = ccl.angular_cl(cosmo, lens[count1], lens[count2], ell)
+            cls[count2,count1] = cls[count1,count2]
+    cls = np.transpose(cls,axes=[2,0,1])
+
+    return cls, cosmo
+
+
+
+# def get_correlation(cosmo, cls, theta):
+#     """ Get theory correlation function.
+#
+#     Args:
+#         cosmo: cosmo object from CCL.
+#         cls: array of cls for each pair of bins.
+#         theta: array with angles for the correlation function.
+#
+#     Returns:
+#         correlation function.
+#
+#     """
+#
+#     return
+
+
+
+# def get_theory(cosmo_params, settings, cosmo, data):
+#     """ Get theory correlation function or Cl's.
+#
+#     Args:
+#         var: array containing the varying cosmo parameters.
+#         settings: dictionary with all the settings used
+#         cosmo: dictionary containing cosmology names,
+#         values and mask
+#
+#     Returns:
+#         array with correlation function or Cl's.
+#
+#     """
+#
+    # # Get cosmological parameters
+    # var_tot = get_cosmo(var, cosmo)
     # #Correlation function
     # xi_th = np.zeros((2, n_bins, n_bins, n_theta))
     # for count1 in range(n_bins):
@@ -146,3 +167,30 @@ def get_theory(var, settings, cosmo):
     #     xi_th = kl_transform(xi_th, datat='corr')
     # xi_th = reshape(xi_th, datat='corr')
     # return xi_th
+
+
+# def get_cosmo(var, cosmo):
+#     """ Build an array with the full cosmological
+#         parameters.
+#
+#     Args:
+#         var: array containing the varying cosmo parameters.
+#         cosmo: dictionary containing cosmology names,
+#         values and mask
+#
+#     Returns:
+#         array with full cosmological parameters.
+#
+#     """
+#
+#     # Array with initial parameters
+#     params = cosmo['params'][:,1]
+#
+#     # Substitute all the varying parameters
+#     count1 = 0
+#     for count2 in range(len(params)):
+#         if cosmo['mask'][count2]:
+#             params[count2] = var[count1]
+#             count1 = count1 + 1
+#
+#     return params

@@ -170,5 +170,47 @@ def sanity_checks(cosmo, settings, path):
         # n_kl
         test = settings['n_kl'] > 0 and settings['n_kl'] <= n_bins
         assert test, 'n_kl should be at least 1 and at most {}'.format(n_bins)
+        # kl_scale_dep can be true only in Fourier space
+        if settings['kl_scale_dep']:
+            test = settings['space'] == 'fourier'
+            assert test, 'KL transform can be scale dependent only in Fourier space'
+
+    return
+
+
+
+def kl_consistent(E, S, N, L, eigval, tol):
+    """ Check if the calculated KL transorm is consistent.
+
+    Args:
+        E, S, N, eigval: KL transorm, signal, noise,
+        eivenvalues respectively.
+        tol: tolerance.
+
+    Returns:
+        None if the checks are passed. Otherwise it raises
+        a warning.
+
+    """
+
+    # Calculate the KL transformed Cl's
+    angular_cl = np.array([np.diag(eigval[x]) for x in range(len(S))])
+
+    # First test
+    test1 = np.array([np.dot(E[x],S[x]+N[x]) for x in range(len(S))])
+    test1 = np.array([np.dot(test1[x],E[x].T) for x in range(len(S))])
+    test1 = np.array([abs(test1[x]-angular_cl[x]) for x in range(len(S))])
+    test1 = test1[2:].max()/abs(angular_cl[2:]).max()
+    # Second test
+    test2 = np.array([np.dot(L[x].T,E[x].T) for x in range(len(S))])
+    test2 = np.array([np.dot(test2[x],E[x]) for x in range(len(S))])
+    test2 = np.array([np.dot(test2[x],L[x]) for x in range(len(S))])
+    test2 = np.array([abs(test2[x]-np.identity(len(range(len(S[0]))))) for x in range(len(S))])
+    test2 = test2[2:].max()
+    if test1>tol or test2>tol:
+        print('WARNING: the transformation matrix does not reproduce the correct Cl\'s.'
+            + ' The relative difference is ' + '{:1.2e}'.format(max(test1,test2))
+            + ' and the maximum accepted is ' + '{:1.2e}'.format(tol) + '.')
+        sys.stdout.flush()
 
     return

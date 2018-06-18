@@ -7,8 +7,10 @@ used to compute the likelihood.
 
 
 import numpy as np
+import math
 
 import cosmo as cosmo_tools
+import checks
 
 
 def how_many_sims(settings, data):
@@ -51,6 +53,7 @@ def how_many_sims(settings, data):
         return int(settings['n_sims'])
 
 
+
 def compute_kl(settings, cosmo, data):
     """ Compute the KL transform.
 
@@ -65,7 +68,49 @@ def compute_kl(settings, cosmo, data):
 
     """
 
-    # Compute theory correlation functions or Cl's
-    var = cosmo['params'][:,1][cosmo['mask']]
-    cosmo_tools.get_theory(var, settings, cosmo)
+    # Compute theory Cl's (S = signal)
+    S, _ = cosmo_tools.get_cls(cosmo['params'][:,1], data['photo_z'], settings['ell_max'])
+
+    # Compute theory Noise and Cholesky decompose it (N=LL^+)
+    n_eff = data['n_eff']*(180.*60./math.pi)**2. #converted in stedrad^-1
+    sigma_g = data['sigma_g']
+    N = np.array([np.diag(sigma_g**2/n_eff) for x in range(len(S))])
+    L = np.linalg.cholesky(N)
+    inv_L = np.linalg.inv(L)
+
+    # Calculate matrix for which we want to calculate eigenvalues and eigenvectors
+    M = np.array([np.dot(inv_L[x],S[x]+N[x]) for x in range(len(S))])
+    M = np.array([np.dot(M[x],inv_L[x].T) for x in range(len(S))])
+
+    # Calculate eigenvalues and eigenvectors
+    eigval, eigvec = np.linalg.eigh(M)
+    # Re-order eigenvalues and eigenvectors sorted from smallest to largest eigenvalue
+    new_ord = np.array([np.argsort(eigval[x])[::-1] for x in range(len(S))])
+    eigval = np.array([eigval[x][new_ord[x]] for x in range(len(S))])
+    eigvec = np.array([eigvec[x][:,new_ord[x]] for x in range(len(S))])
+
+    # Calculate transformation matrix (E) from eigenvectors and L^-1
+    E = np.array([np.dot(eigvec[x].T,inv_L[x]) for x in range(len(S))])
+    # Change sign to eigenvectors according to the first element
+    signs = np.array([[np.sign(E[ell][x][0]/E[2][x][0]) for x in range(len(S[0]))] for ell in range(len(S))])
+    E = np.array([(E[x].T*signs[x]).T for x in range(len(S))])
+
+    # Test if the transformation matrix gives the correct new Cl's
+    checks.kl_consistent(E, S, N, L, eigval, 1.e-12)
+
+    # Return either the scale dependent or independent KL transorm
+    if settings['kl_scale_dep']:
+        return E
+    else:
+        E_avg = np.zeros((len(E[0]),len(E[0])))
+        den = np.array([(2.*x+1) for x in range(2,len(E))]).sum()
+        for n in range(len(E[0])):
+            for m in range(len(E[0])):
+                num = np.array([(2.*x+1)*E[:,n][:,m][x] for x in range(2,len(E))]).sum()
+                E_avg[n][m] = num/den
+        return E_avg
+
+
+    # var = cosmo['params'][:,1][cosmo['mask']]
+    # cosmo_tools.get_theory(var, settings, cosmo, data)
     return

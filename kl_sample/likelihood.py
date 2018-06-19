@@ -3,23 +3,30 @@
 This module contains all the relevant functions
 used to compute the likelihood.
 
-"""
+Functions:
+ - how_many_sims(data, settings)
+ - compute_kl(cosmo, data, settings)
+ - apply_kl(kl_t, corr)
+ - compute_covmat(data, settings)
 
+"""
 
 import numpy as np
 import math
 import random
-
 import cosmo as cosmo_tools
 import checks
 
 
-def how_many_sims(settings, data):
+
+# ------------------- How many sims -------------------------------------------#
+
+def how_many_sims(data, settings):
     """ Compute how many simulations will be used.
 
     Args:
-        settings: dictionary with all the settings used
-        data: dictionary containing the data stored
+        data: dictionary containing the data stored.
+        settings: dictionary with all the settings used.
 
     Returns:
         int: the number of simulations that will be used.
@@ -32,6 +39,7 @@ def how_many_sims(settings, data):
     # If all simulations wanted, return it
     if settings['n_sims']=='all':
         return tot_sims
+
     # If auto, calculate how many sims should be used
     elif settings['n_sims']=='auto':
         # Number of angle data points
@@ -52,19 +60,22 @@ def how_many_sims(settings, data):
             n_kl = settings['n_kl']
             tot_data = n_x_var*n_kl
         return int(round((2.+tot_data-ratio)/(1.-ratio)))
+
+    # If it is a number, just return it
     else:
         return int(settings['n_sims'])
 
 
+# ------------------- KL related ----------------------------------------------#
 
-def compute_kl(settings, cosmo, data):
+def compute_kl(cosmo, data, settings):
     """ Compute the KL transform.
 
     Args:
-        settings: dictionary with all the settings used
         cosmo: dictionary containing cosmology names,
-        values and mask
-        data: dictionary containing the data stored
+        values and mask.
+        data: dictionary containing the data stored.
+        settings: dictionary with all the settings used.
 
     Returns:
         array with the KL transform that will be used.
@@ -72,7 +83,8 @@ def compute_kl(settings, cosmo, data):
     """
 
     # Compute theory Cl's (S = signal)
-    S, _ = cosmo_tools.get_cls(cosmo['params'][:,1], data['photo_z'], settings['ell_max'])
+    cosmo_ccl = cosmo_tools.get_cosmo_ccl(cosmo['params'][:,1])
+    S = cosmo_tools.get_cls_ccl(cosmo_ccl, data['photo_z'], settings['ell_max'])
 
     # Compute theory Noise and Cholesky decompose it (N=LL^+)
     n_eff = data['n_eff']*(180.*60./math.pi)**2. #converted in stedrad^-1
@@ -104,6 +116,7 @@ def compute_kl(settings, cosmo, data):
     # Return either the scale dependent or independent KL transform
     if settings['kl_scale_dep']:
         return E
+
     else:
         E_avg = np.zeros((len(E[0]),len(E[0])))
         den = np.array([(2.*x+1) for x in range(2,len(E))]).sum()
@@ -112,7 +125,6 @@ def compute_kl(settings, cosmo, data):
                 num = np.array([(2.*x+1)*E[:,n][:,m][x] for x in range(2,len(E))]).sum()
                 E_avg[n][m] = num/den
         return E_avg
-
 
 
 def apply_kl(kl_t, corr):
@@ -127,11 +139,11 @@ def apply_kl(kl_t, corr):
 
     """
 
-    # TODO: here I am assuming real space and kl not scale dependent
     corr_kl = kl_t.dot(corr).dot(kl_t.T)
     return np.transpose(corr_kl, axes=[1, 2, 0, 3])
 
 
+# ------------------- Covmat --------------------------------------------------#
 
 def compute_covmat(data, settings):
     """ Compute covariance matrix and its inverse.

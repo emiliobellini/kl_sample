@@ -8,7 +8,6 @@ single point (single_point).
 """
 
 import numpy as np
-
 import io
 import cosmo as cosmo_tools
 import checks
@@ -29,6 +28,8 @@ def run(args):
     """
 
 
+    # ------------------- Initialize ------------------------------------------#
+
     # Define absolute paths and check the existence of each required file
     path = {
         'params'  : io.file_exists_or_error(args.params_file),
@@ -42,7 +43,7 @@ def run(args):
     # Create array with cosmo parameters
     cosmo = {}
     cosmo['names']  = ['h', 'omega_c', 'omega_b', 'ln10_A_s', 'n_s']
-    cosmo['params'] = cosmo_tools.get_cosmo_array(path['params'], cosmo['names'])
+    cosmo['params'] = io.read_cosmo_array(path['params'], cosmo['names'])
     cosmo['mask']   = cosmo_tools.get_cosmo_mask(cosmo['params'])
 
 
@@ -97,25 +98,41 @@ def run(args):
     settings['n_x_var'] = len(data['x_var'])
 
 
+
+    # ------------------- Preliminary computations ----------------------------#
+
+
     # Compute how many simulations have to be used
-    settings['n_sims'] = lkl.how_many_sims(settings, data)
+    settings['n_sims'] = lkl.how_many_sims(data, settings)
 
 
-    # If required, compute the KL transform and apply it
+    # If KL
     if settings['method'] in ['kl_off_diag', 'kl_diag']:
-        data['kl_t'] = lkl.compute_kl(settings, cosmo, data)
+        # Compute KL transform
+        data['kl_t'] = lkl.compute_kl(cosmo, data, settings)
+        # Apply KL to observed correlation function
         data['corr_obs'] = lkl.apply_kl(data['kl_t'], data['corr_obs'])
+        # Apply KL to simulated correlation functions
         data['corr_sim'] = np.array([
-            lkl.apply_kl(
-                data['kl_t'],
-                data['corr_sim'][x]
-            ) for x in range(len(data['corr_sim']))])
+            lkl.apply_kl(data['kl_t'], data['corr_sim'][x])
+            for x in range(len(data['corr_sim']))])
 
-    rsh.flatten_xipm(
-            data['corr_obs'],
-            data['mask_x_var'],
-            settings
-            )
+
+    # Reshape correlation functions
+    cosmo_ccl = cosmo_tools.get_cosmo_ccl(cosmo['params'][:,1])
+    cls = cosmo_tools.get_cls_ccl(cosmo_ccl, data['photo_z'], settings['ell_max'])
+    xipm = cosmo_tools.get_xipm_ccl(cosmo, cls, data['x_var'])
+    print xipm.shape
+
+    print settings
+    print data.keys()
+
+    #
+    # rsh.flatten_xipm(
+    #         data['corr_obs'],
+    #         data['mask_x_var'],
+    #         settings
+    #         )
 #     # Reshape correlation functions
 #     data['corr_obs'] = rsh.flatten_xipm(
 #         data['corr_obs'],

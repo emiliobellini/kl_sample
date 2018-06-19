@@ -3,49 +3,20 @@
 Module containing all the relevant functions
 to compute and manipulate cosmology.
 
+Functions:
+ - get_cosmo_mask(params)
+ - get_cosmo_ccl(params)
+ - get_cls_ccl(cosmo, pz, ell_max)
+ - get_xipm_ccl(cosmo, cls, theta)
+
 """
 
 import numpy as np
-
 import pyccl as ccl
 
-import io
 
 
-
-def get_cosmo_array(fname, pars):
-    """ Read from the parameter file the cosmological
-        parameters and store them in an array.
-
-    Args:
-        fname: path of the input file.
-        pars: list of the cosmological parameters. Used
-        to determine the order in which they are stored
-
-    Returns:
-        cosmo_params: array containing the cosmological
-        parameters. Each parameter is a row as
-        [left_bound, central, right_bound].
-
-    """
-
-    # Initialize the array
-    cosmo_params = []
-    # Run over the parameters and append them
-    # to the array
-    for n, par in enumerate(pars):
-        # Get the values of the parameter
-        value = io.read_param(fname, par, type='cosmo')
-        # Check that the parameter has the correct shape and
-        # it is not a string
-        if len(value)==3 and type(value) is not str:
-            cosmo_params.append(value)
-        else:
-            raise IOError('Check the value of ' + par + '!')
-
-    return np.array(cosmo_params)
-
-
+# ------------------- Masks ---------------------------------------------------#
 
 def get_cosmo_mask(params):
     """ Infer from the cosmological parameters
@@ -71,33 +42,46 @@ def get_cosmo_mask(params):
     return np.array([is_varying(x) for x in params])
 
 
+# ------------------- CCL related ---------------------------------------------#
 
-def get_cls(cosmo_params, pz, ell_max):
+def get_cosmo_ccl(params):
+    """ Get cosmo object.
+
+    Args:
+        params: array with cosmological parameters.
+
+    Returns:
+        cosmo object from CCL.
+
+    """
+
+    cosmo = ccl.Cosmology(
+        h        = params[0],
+        Omega_c  = params[1]/params[0]**2.,
+        Omega_b  = params[2]/params[0]**2.,
+        A_s      = (10.**(-10.))*np.exp(params[3]),
+        n_s      = params[4]
+        )
+
+    return cosmo
+
+
+def get_cls_ccl(cosmo, pz, ell_max):
     """ Get theory Cl's.
 
     Args:
-        cosmo_params: array with cosmological parameters.
+        cosmo: cosmo object from CCL.
         pz: probability distribution for each redshift bin.
         ell_max: maximum multipole.
 
     Returns:
         array with Cl's.
-        cosmo object from CCL.
 
     """
 
     # Local variables
     n_bins = len(pz)-1
     n_ells = ell_max+1
-
-    # Cosmology
-    cosmo = ccl.Cosmology(
-        h        = cosmo_params[0],
-        Omega_c  = cosmo_params[1]/cosmo_params[0]**2.,
-        Omega_b  = cosmo_params[2]/cosmo_params[0]**2.,
-        A_s      = (10.**(-10.))*np.exp(cosmo_params[3]),
-        n_s      = cosmo_params[4]
-        )
 
     # Tracers
     lens = np.array([
@@ -117,26 +101,41 @@ def get_cls(cosmo_params, pz, ell_max):
             cls[count2,count1] = cls[count1,count2]
     cls = np.transpose(cls,axes=[2,0,1])
 
-    return cls, cosmo
+    return cls
 
 
+def get_xipm_ccl(cosmo, cls, theta):
+    """ Get theory correlation function.
 
-# def get_correlation(cosmo, cls, theta):
-#     """ Get theory correlation function.
-#
-#     Args:
-#         cosmo: cosmo object from CCL.
-#         cls: array of cls for each pair of bins.
-#         theta: array with angles for the correlation function.
-#
-#     Returns:
-#         correlation function.
-#
-#     """
-#
-#     return
+    Args:
+        cosmo: cosmo object from CCL.
+        cls: array of cls for each pair of bins.
+        theta: array with angles for the correlation function.
+
+    Returns:
+        correlation function.
+
+    """
+
+    # Local variables
+    n_bins = cls.shape[-1]
+    n_theta = len(theta)
+
+    # Main loop: compute correlation function for each bin pair
+    xi_th = np.zeros((2, n_bins, n_bins, n_theta))
+    for count1 in range(n_bins):
+        for count2 in range(n_bins):
+            for count3 in range(n_theta):
+                xi_th[0,count1,count2,count3] = ccl.correlation(cosmo, ell, cls[:,count1,count2], theta[count3], corr_type='L+', method='FFTLog')
+                xi_th[1,count1,count2,count3] = ccl.correlation(cosmo, ell, cls[:,count1,count2], theta[count3], corr_type='L-', method='FFTLog')
+
+    # Transpose to have (pm, theta, bin1, bin2)
+    xi_th = np.transpose(xi_th,axes=[0,3,1,2])
+
+    return xi_th
 
 
+# ------------------- KL related ----------------------------------------------#
 
 # def get_theory(cosmo_params, settings, cosmo, data):
 #     """ Get theory correlation function or Cl's.
@@ -155,13 +154,6 @@ def get_cls(cosmo_params, pz, ell_max):
     # # Get cosmological parameters
     # var_tot = get_cosmo(var, cosmo)
     # #Correlation function
-    # xi_th = np.zeros((2, n_bins, n_bins, n_theta))
-    # for count1 in range(n_bins):
-    #     for count2 in range(n_bins):
-    #         for count3 in range(n_theta):
-    #             xi_th[0,count1,count2,count3] = ccl.correlation(cosmo, ell, cls[:,count1,count2], theta[count3], corr_type='L+', method='FFTLog')
-    #             xi_th[1,count1,count2,count3] = ccl.correlation(cosmo, ell, cls[:,count1,count2], theta[count3], corr_type='L-', method='FFTLog')
-    # xi_th = np.transpose(xi_th,axes=[0,3,1,2])
     # #Reshape and eventually KL transform
     # if is_kl:
     #     xi_th = kl_transform(xi_th, datat='corr')

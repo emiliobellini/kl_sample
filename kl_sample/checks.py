@@ -188,10 +188,10 @@ def sanity_checks(cosmo, settings, path):
 # ------------------- Calculations related ------------------------------------#
 
 def kl_consistent(E, S, N, L, eigval, tol):
-    """ Check if the calculated KL transorm is consistent.
+    """ Check if the calculated KL transform is consistent.
 
     Args:
-        E, S, N, eigval: KL transorm, signal, noise,
+        E, S, N, eigval: KL transform, signal, noise,
         eivenvalues respectively.
         tol: tolerance.
 

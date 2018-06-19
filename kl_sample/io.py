@@ -7,6 +7,7 @@ Functions:
  - file_exists_or_error(fname)
  - folder_exists_or_create(fname)
  - read_param(fname, par, type)
+ - read_cosmo_array(fname, pars)
  - read_from_fits(fname, name)
  - write_to_fits(fname, array, name)
  - print_info_fits(fname)
@@ -169,7 +170,7 @@ def read_param(fname, par, type='string'):
             raise IOError('Boolean type for ' + par + ' not recognized!')
     # Cosmo type has to be returned as a three dimensional array
     # The check that it has been converted correctly is done in
-    # get_cosmo_array.
+    # read_cosmo_array.
     elif type == 'cosmo':
         try:
             return np.array([float(value), float(value), float(value)])
@@ -183,6 +184,39 @@ def read_param(fname, par, type='string'):
     # All other types (such as strings) will be returned as strings
     else:
         return value
+
+
+def read_cosmo_array(fname, pars):
+    """ Read from the parameter file the cosmological
+        parameters and store them in an array.
+
+    Args:
+        fname: path of the input file.
+        pars: list of the cosmological parameters. Used
+        to determine the order in which they are stored
+
+    Returns:
+        cosmo_params: array containing the cosmological
+        parameters. Each parameter is a row as
+        [left_bound, central, right_bound].
+
+    """
+
+    # Initialize the array
+    cosmo_params = []
+    # Run over the parameters and append them
+    # to the array
+    for n, par in enumerate(pars):
+        # Get the values of the parameter
+        value = read_param(fname, par, type='cosmo')
+        # Check that the parameter has the correct shape and
+        # it is not a string
+        if len(value)==3 and type(value) is not str:
+            cosmo_params.append(value)
+        else:
+            raise IOError('Check the value of ' + par + '!')
+
+    return np.array(cosmo_params)
 
 
 # ------------------- FITS files ----------------------------------------------#

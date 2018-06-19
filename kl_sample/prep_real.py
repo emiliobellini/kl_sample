@@ -11,6 +11,7 @@ import os
 import numpy as np
 
 import settings as set
+import reshape as rsh
 
 def prep_real(args):
     """ Prepare data in real space.
@@ -26,7 +27,7 @@ def prep_real(args):
 
     # Define absolute paths and check the existence of each required file
     path = {
-        # 'data'    : io.file_exists_or_error(args.input_folder + 'data.fits'),
+        'data'    : io.file_exists_or_error(args.input_folder + 'data.fits'),
         'xipm'    : io.file_exists_or_error(args.input_folder + 'xipm.dat'),
         'sims'    : io.file_exists_or_error(args.input_folder + 'mockxipm.tar.gz'),
         'output'  : io.folder_exists_or_create(os.path.abspath('') + '/data') + '/data_real.fits'
@@ -43,14 +44,14 @@ def prep_real(args):
 
     # Read and reshape xipm observed
     xipm = np.loadtxt(path['xipm'], dtype='float64')
-    xipm = io.unflatten_xipm(xipm[:,1])
+    xipm = rsh.unflatten_xipm(xipm[:,1])
     io.write_to_fits(fname=path['output'], array=xipm, name='xipm_obs')
 
 
     # Read and reshape xipm from simulations
     xipm, xipm_w = io.unpack_and_stack(fname=path['sims'])
-    xipm = np.array([io.unflatten_xipm(x) for x in xipm])
-    xipm_w = np.array([io.unflatten_xipm(x) for x in xipm_w])
+    xipm = np.array([rsh.unflatten_xipm(x) for x in xipm])
+    xipm_w = np.array([rsh.unflatten_xipm(x) for x in xipm_w])
     io.write_to_fits(fname=path['output'], array=xipm, name='xipm_sim')
     io.write_to_fits(fname=path['output'], array=xipm_w, name='xipm_sim_w')
 

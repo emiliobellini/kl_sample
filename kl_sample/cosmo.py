@@ -35,7 +35,7 @@ def get_cosmo_array(fname, pars):
     # to the array
     for n, par in enumerate(pars):
         # Get the values of the parameter
-        value = io.get_param(fname, par, type='cosmo')
+        value = io.read_param(fname, par, type='cosmo')
         # Check that the parameter has the correct shape and
         # it is not a string
         if len(value)==3 and type(value) is not str:

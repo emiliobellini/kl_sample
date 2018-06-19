@@ -1,4 +1,9 @@
-# Settings
+"""
+
+General settings: default variables.
+
+"""
+
 import numpy as np
 
 
@@ -23,8 +28,10 @@ default_params = {
     'n_threads'     : 2
 }
 
+
 #Photo-z Bins (minimum, maximum and intermediate bins)
 Z_BINS = [0.15,0.29,0.43,0.57,0.70,0.90,1.10,1.30]
+
 
 #Angles of the correlation functions
 THETA_ARCMIN = [  1.41,  2.79,  5.53,  11.0,  21.7,  43.0,  85.2]
@@ -33,9 +40,11 @@ MASK_THETA   = [
                [ False, False, False,  True,  True,  True,  True]
                ]
 
+
 #CFHTlens specifications
 CFHTlens_dZ = 0.05
 CFHTlens_A_eff = 94.4*(60.**2.) #in arcmin^-2
+
 
 #Criteria used to select the data
 def get_mask(data, z_min, z_max):

@@ -1,6 +1,17 @@
 """
 
-Module containing all the input/output related functions
+Module containing all the input/output related functions.
+
+Functions defined here:
+ - argument_parser()
+ - file_exists_or_error(fname)
+ - folder_exists_or_create(fname)
+ - read_param(fname, par, type)
+ - unpack_and_stack(fname)
+ - read_photo_z_data(fname)
+ - read_from_fits(fname, name)
+ - write_to_fits(fname, array, name)
+ - print_info_fits(fname)
 
 """
 
@@ -11,10 +22,11 @@ import re
 import tarfile
 import numpy as np
 from astropy.io import fits
-
 import settings as set
 
 
+
+# ------------------- Parser --------------------------------------------------#
 
 def argument_parser():
     """ Call the parser to read command line arguments.
@@ -57,6 +69,7 @@ def argument_parser():
     return parser.parse_args()
 
 
+# ------------------- Check existence -----------------------------------------#
 
 def file_exists_or_error(fname):
     """ Check if a file exists, otherwise it returns error.
@@ -99,38 +112,9 @@ def folder_exists_or_create(fname):
     return abspath
 
 
+# ------------------- Read ini ------------------------------------------------#
 
-def write_to_fits(fname, array, name):
-    """ Write an array to a fits file.
-
-    Args:
-        fname: path of the input file.
-        array: array to save.
-        name: name of the image.
-
-    Returns:
-        value: value of the parameter par
-
-    """
-
-    # If file does not exist, create it
-    if not os.path.exists(fname):
-        hdul = fits.HDUList([fits.PrimaryHDU()])
-        hdul.writeto(fname)
-    # Open the file
-    with fits.open(fname, mode='update') as hdul:
-        try:
-            hdul.__delitem__(name)
-        except:
-            pass
-        hdul.append(fits.ImageHDU(array, name=name))
-    print('Appended ' + name.upper() + ' to ' + os.path.relpath(fname))
-    sys.stdout.flush()
-    return
-
-
-
-def get_param(fname, par, type='string'):
+def read_param(fname, par, type='string'):
     """ Return the value of a parameter, either from the
         input file or from the default settings.
 
@@ -202,53 +186,7 @@ def get_param(fname, par, type='string'):
         return value
 
 
-
-def get_data_from_fits(fname, dname):
-    """ Open a fits file and read data from it.
-
-    Args:
-        fname: path of the data file.
-        dname: name of the data we want to extract.
-
-    Returns:
-        array with data for dname.
-
-    """
-    with fits.open(fname) as fn:
-        return fn[dname].data
-
-
-
-#Given the position in the file, find the corresponding position in the array
-def position_xipm(n):
-    n_bins = len(set.Z_BINS)-1
-    n_theta = len(set.THETA_ARCMIN)
-    n_theta_xip = np.array(set.MASK_THETA[0]).astype(int).sum()
-    n_theta_xim = np.array(set.MASK_THETA[1]).astype(int).sum()
-    p_max = (n_theta_xip+n_theta_xim)*n_bins*(n_bins+1)/2
-    if n>=p_max:
-        raise ValueError("The input number is larger than expected!")
-    div, mod = np.divmod(n, n_theta_xip+n_theta_xim)
-    if mod<n_theta_xip:
-        p_pm = 0
-        p_theta = mod
-    else:
-        p_pm = 1
-        p_theta = 3+mod-n_theta_xip
-    intervals = np.flip(np.array([np.arange(x,n_bins+1).sum() for x in np.arange(2,n_bins+2)]),0)
-    p_bin_1 = np.where(intervals<=div)[0][-1]
-    p_bin_2 = div - intervals[p_bin_1] + p_bin_1
-    return p_pm, p_theta, p_bin_1, p_bin_2
-
-def unflatten_xipm(array):
-    n_bins = len(set.Z_BINS)-1
-    n_theta = len(set.THETA_ARCMIN)
-    xipm = np.zeros((2, n_theta, n_bins, n_bins))
-    for count in range(len(array)):
-        p_pm, p_theta, p_bin_1, p_bin_2 = position_xipm(count)
-        xipm[p_pm,p_theta,p_bin_1,p_bin_2] = array[count]
-        xipm[p_pm,p_theta,p_bin_2,p_bin_1] = array[count]
-    return xipm
+# ------------------- On preliminary data -------------------------------------#
 
 def unpack_and_stack(fname):
     n_bins = len(set.Z_BINS)-1
@@ -310,7 +248,64 @@ def read_photo_z_data(fname):
     return photo_z, n_eff, sigma_g
 
 
+# ------------------- FITS files ----------------------------------------------#
+
+def read_from_fits(fname, name):
+    """ Open a fits file and read data from it.
+
+    Args:
+        fname: path of the data file.
+        name: name of the data we want to extract.
+
+    Returns:
+        array with data for name.
+
+    """
+    with fits.open(fname) as fn:
+        return fn[name].data
+
+
+
+def write_to_fits(fname, array, name):
+    """ Write an array to a fits file.
+
+    Args:
+        fname: path of the input file.
+        array: array to save.
+        name: name of the image.
+
+    Returns:
+        None
+
+    """
+
+    # If file does not exist, create it
+    if not os.path.exists(fname):
+        hdul = fits.HDUList([fits.PrimaryHDU()])
+        hdul.writeto(fname)
+    # Open the file
+    with fits.open(fname, mode='update') as hdul:
+        try:
+            hdul.__delitem__(name)
+        except:
+            pass
+        hdul.append(fits.ImageHDU(array, name=name))
+    print('Appended ' + name.upper() + ' to ' + os.path.relpath(fname))
+    sys.stdout.flush()
+    return
+
+
+
 def print_info_fits(fname):
+    """ Print on screen fits file info.
+
+    Args:
+        fname: path of the input file.
+
+    Returns:
+        None
+
+    """
     with fits.open(fname) as hdul:
         print(hdul.info())
         sys.stdout.flush()

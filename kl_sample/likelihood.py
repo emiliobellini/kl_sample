@@ -133,34 +133,6 @@ def apply_kl(kl_t, corr):
 
 
 
-def reshape_corr(corr, settings, mask):
-    """ Reshape the correlation function.
-
-    Args:
-        corr: correlation function
-        settings: dictionary with settings
-
-    Returns:
-        reshaped correlation function.
-
-    """
-
-    data_r = corr.reshape(
-        (2*settings['n_x_var'],settings['n_bins'],settings['n_bins'])
-        )
-    data_r = np.triu(data_r[mask.flatten()])
-    if settings['method'] in ['kl_off_diag', 'kl_diag']:
-        data_r = data_r[:,:settings['n_kl'],:settings['n_kl']]
-        if settings['method'] == 'kl_diag':
-            data_r = np.diagonal(data_r,  axis1=1, axis2=2)
-    data_r = np.transpose(data_r, axes=[1,2,0])
-    data_r = data_r.flatten()
-    data_r = data_r[data_r != 0]
-
-    return data_r
-
-
-
 def compute_covmat(data, settings):
     """ Compute covariance matrix and its inverse.
 

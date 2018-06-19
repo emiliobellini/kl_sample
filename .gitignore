@@ -109,3 +109,5 @@ output/*
 # Other files
 *.out
 *.sh.sh
+python.sh
+.bashrc

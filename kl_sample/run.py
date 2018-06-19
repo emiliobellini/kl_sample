@@ -119,10 +119,6 @@ def run(args):
 
 
     # Reshape correlation functions
-    cosmo_ccl = cosmo_tools.get_cosmo_ccl(cosmo['params'][:,1])
-    cls = cosmo_tools.get_cls_ccl(cosmo_ccl, data['photo_z'], settings['ell_max'])
-    xipm = cosmo_tools.get_xipm_ccl(cosmo, cls, data['x_var'])
-    print xipm.shape
 
     print settings
     print data.keys()

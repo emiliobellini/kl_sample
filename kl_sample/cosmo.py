@@ -120,14 +120,15 @@ def get_xipm_ccl(cosmo, cls, theta):
     # Local variables
     n_bins = cls.shape[-1]
     n_theta = len(theta)
+    ell = range(2,len(cls))
 
     # Main loop: compute correlation function for each bin pair
     xi_th = np.zeros((2, n_bins, n_bins, n_theta))
-    for count1 in range(n_bins):
-        for count2 in range(n_bins):
-            for count3 in range(n_theta):
-                xi_th[0,count1,count2,count3] = ccl.correlation(cosmo, ell, cls[:,count1,count2], theta[count3], corr_type='L+', method='FFTLog')
-                xi_th[1,count1,count2,count3] = ccl.correlation(cosmo, ell, cls[:,count1,count2], theta[count3], corr_type='L-', method='FFTLog')
+    for c1 in range(n_bins):
+        for c2 in range(n_bins):
+            for c3 in range(n_theta):
+                xi_th[0,c1,c2,c3] = ccl.correlation(cosmo, ell, cls[:,c1,c2], theta[c3], corr_type='L+', method='FFTLog')
+                xi_th[1,c1,c2,c3] = ccl.correlation(cosmo, ell, cls[:,c1,c2], theta[c3], corr_type='L-', method='FFTLog')
 
     # Transpose to have (pm, theta, bin1, bin2)
     xi_th = np.transpose(xi_th,axes=[0,3,1,2])

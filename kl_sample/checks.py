@@ -3,14 +3,21 @@
 This module contains checks that needs to be performed
 to ensure that the input is consistent.
 
+Functions:
+ - unused_params(cosmo, settings, path)
+ - sanity_checks(cosmo, settings, path)
+ - kl_consistent(E, S, N, L, eigval, tol)
+
 """
 
 import re
 import sys
 import numpy as np
-
 from astropy.io import fits
 
+
+
+# ------------------- Preliminary ---------------------------------------------#
 
 def unused_params(cosmo, settings, path):
     """ Check if there are unused.
@@ -178,6 +185,7 @@ def sanity_checks(cosmo, settings, path):
     return
 
 
+# ------------------- Calculations related ------------------------------------#
 
 def kl_consistent(E, S, N, L, eigval, tol):
     """ Check if the calculated KL transorm is consistent.
@@ -201,12 +209,15 @@ def kl_consistent(E, S, N, L, eigval, tol):
     test1 = np.array([np.dot(test1[x],E[x].T) for x in range(len(S))])
     test1 = np.array([abs(test1[x]-angular_cl[x]) for x in range(len(S))])
     test1 = test1[2:].max()/abs(angular_cl[2:]).max()
+
     # Second test
     test2 = np.array([np.dot(L[x].T,E[x].T) for x in range(len(S))])
     test2 = np.array([np.dot(test2[x],E[x]) for x in range(len(S))])
     test2 = np.array([np.dot(test2[x],L[x]) for x in range(len(S))])
     test2 = np.array([abs(test2[x]-np.identity(len(range(len(S[0]))))) for x in range(len(S))])
     test2 = test2[2:].max()
+
+    # Warning message
     if test1>tol or test2>tol:
         print('WARNING: the transformation matrix does not reproduce the correct Cl\'s.'
             + ' The relative difference is ' + '{:1.2e}'.format(max(test1,test2))

@@ -89,6 +89,7 @@ def run(args):
         data['mask_x_var'] = io.read_from_fits(path['data'], 'mask_theta').astype(bool)
         data['corr_obs'] = io.read_from_fits(path['data'], 'xipm_obs')
         data['corr_sim'] = io.read_from_fits(path['data'], 'xipm_sim')
+        data['corr_sim_w'] = io.read_from_fits(path['data'], 'xipm_sim_w')
     elif settings['space']=='fourier':
         raise ValueError('Fourier space not implemented yet!')
 
@@ -104,6 +105,7 @@ def run(args):
 
     # Compute how many simulations have to be used
     settings['n_sims'] = lkl.how_many_sims(data, settings)
+    data['corr_sim'], data['corr_sim_w'] = lkl.select_sims(data, settings)
 
 
     # If KL
@@ -118,28 +120,34 @@ def run(args):
             for x in range(len(data['corr_sim']))])
 
 
-    # Reshape correlation functions
+    # Reshape observed correlation function
+    data['corr_obs'] = rsh.flatten_xipm(data['corr_obs'], data['mask_x_var'], settings)
 
-    print settings
-    print data.keys()
+    # Reshape simulated correlation functions and weights
+    data['corr_sim'] = np.array([rsh.flatten_xipm(
+        data['corr_sim'][x],
+        data['mask_x_var'],
+        settings
+        ) for x in range(len(data['corr_sim']))])
+    data['corr_sim_w'] = np.array([rsh.flatten_xipm(
+        data['corr_sim_w'][x],
+        data['mask_x_var'],
+        settings
+        ) for x in range(len(data['corr_sim_w']))])
 
-    #
-    # rsh.flatten_xipm(
-    #         data['corr_obs'],
-    #         data['mask_x_var'],
-    #         settings
-    #         )
+    avg = np.average(data['corr_sim'], axis=0)
+    dc = data['corr_sim']-avg
+    covmat = np.cov(dc.T)
+    test = np.loadtxt('/home/bellini/Data/cfhtlens/preliminary/xipmcutcov_cfhtlens_sub2_4mask_regcomb_blind1_passfields_athenasj.dat')[:,2]
+    test=test.reshape((280,280))
+    # print (covmat-test)/covmat
+    print covmat[0,0]
+    print test[0,0]
+    # print (covmat-test)/covmat
+    # print data['corr_sim_w'].shape
+    # print data.keys()
+
 #     # Reshape correlation functions
-#     data['corr_obs'] = rsh.flatten_xipm(
-#         data['corr_obs'],
-#         data['mask_x_var'],
-#         settings
-#         )
-#     data['corr_sim'] = np.array([rsh.flatten_xipm(
-#         data['corr_sim'][x],
-#         data['mask_x_var'],
-#         settings
-#         ) for x in range(len(data['corr_sim']))])
 #
 #
 #
@@ -161,8 +169,6 @@ def run(args):
 #     # Compute covariance matrix (and its inverse)
 #     data['cov_mat'], data['inv_cov_mat'] = lkl.compute_covmat(data, settings)
 #
-#     test = np.loadtxt('/home/bellini/Data/cfhtlens/preliminary/xipmcutcov_cfhtlens_sub2_4mask_regcomb_blind1_passfields_athenasj.dat')[:,2]
-#     test=test.reshape((280,280))
 #
 #     # print data['cov_mat'].shape
 #     # print test-data['cov_mat']

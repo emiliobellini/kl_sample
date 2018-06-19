@@ -5,6 +5,7 @@ used to compute the likelihood.
 
 Functions:
  - how_many_sims(data, settings)
+ - select_sims(data, settings)
  - compute_kl(cosmo, data, settings)
  - apply_kl(kl_t, corr)
  - compute_covmat(data, settings)
@@ -19,7 +20,7 @@ import checks
 
 
 
-# ------------------- How many sims -------------------------------------------#
+# ------------------- Simulations ---------------------------------------------#
 
 def how_many_sims(data, settings):
     """ Compute how many simulations will be used.
@@ -64,6 +65,31 @@ def how_many_sims(data, settings):
     # If it is a number, just return it
     else:
         return int(settings['n_sims'])
+
+
+def select_sims(data, settings):
+    """ Select simulations to use.
+
+    Args:
+        data: dictionary containing the data stored.
+        settings: dictionary with all the settings used.
+
+    Returns:
+        array of simulations that will be used.
+        array of weights for each simulation.
+
+    """
+
+    # Local variables
+    n_sims = settings['n_sims']
+
+    # Select simulations
+    rnd = random.sample(range(len(data['corr_sim'])), settings['n_sims'])
+    # Generate arrays of simulations and weights
+    sims = np.array([data['corr_sim'][x] for x in rnd])
+    sims_w = np.array([data['corr_sim_w'][x] for x in rnd])
+
+    return sims, sims_w
 
 
 # ------------------- KL related ----------------------------------------------#

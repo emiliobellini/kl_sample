@@ -2,7 +2,7 @@
 
 Module containing all the input/output related functions.
 
-Functions defined here:
+Functions:
  - argument_parser()
  - file_exists_or_error(fname)
  - folder_exists_or_create(fname)
@@ -10,7 +10,7 @@ Functions defined here:
  - read_from_fits(fname, name)
  - write_to_fits(fname, array, name)
  - print_info_fits(fname)
- - unpack_simulated_correlations(fname)
+ - unpack_simulated_xipm(fname)
  - read_photo_z_data(fname)
 
 """
@@ -250,7 +250,7 @@ def print_info_fits(fname):
 
 # ------------------- On preliminary data -------------------------------------#
 
-def unpack_simulated_correlations(fname):
+def unpack_simulated_xipm(fname):
     """ Unpack a tar file containing the simulated
         correlation functions and write them into
         a single array.
@@ -277,7 +277,6 @@ def unpack_simulated_correlations(fname):
     n_sims, mod = np.divmod(sum(1 for x in tar.getmembers() if x.isreg()), n_bins*(n_bins+1)/2)
     if mod != 0:
         raise IOError('The number of files in ' + fname + ' is not correct!')
-    n_sims = 5 #TODO:remove this
 
     # Initialize arrays
     xipm_sims = np.zeros((n_sims, n_theta*n_bins*(n_bins+1)/2))

@@ -7,7 +7,7 @@ General settings: default variables.
 import numpy as np
 
 
-#Default parameters
+# Default parameters
 default_params = {
     'h'             : [  0.61,    0.61197750,     0.81],
     'omega_c'       : [ 0.001,    0.11651890,     0.99],
@@ -29,11 +29,11 @@ default_params = {
 }
 
 
-#Photo-z Bins (minimum, maximum and intermediate bins)
+# Photo-z Bins (minimum, maximum and intermediate bins)
 Z_BINS = [0.15,0.29,0.43,0.57,0.70,0.90,1.10,1.30]
 
 
-#Angles of the correlation functions
+# Angles of the correlation functions
 THETA_ARCMIN = [  1.41,  2.79,  5.53,  11.0,  21.7,  43.0,  85.2]
 MASK_THETA   = [
                [  True,  True,  True,  True,  True,  True, False],
@@ -41,12 +41,12 @@ MASK_THETA   = [
                ]
 
 
-#CFHTlens specifications
+# CFHTlens specifications
 CFHTlens_dZ = 0.05
 CFHTlens_A_eff = 94.4*(60.**2.) #in arcmin^-2
 
 
-#Criteria used to select the data
+# Criteria used to select the data
 def get_mask(data, z_min, z_max):
 
     sel = data['Z_B']>=z_min
@@ -59,7 +59,7 @@ def get_mask(data, z_min, z_max):
     return sel
 
 
-#Good fit patterns
+# Good fit patterns
 good_fit_patterns = ['W1m0m0', 'W1m0m3', 'W1m0m4', 'W1m0p1', 'W1m0p2', 'W1m0p3', 'W1m1m0',
                      'W1m1m2', 'W1m1m3', 'W1m1m4', 'W1m1p3', 'W1m2m1', 'W1m2m2', 'W1m2m3',
                      'W1m2p1', 'W1m2p2', 'W1m3m0', 'W1m3m2', 'W1m3m4', 'W1m3p1', 'W1m3p3',

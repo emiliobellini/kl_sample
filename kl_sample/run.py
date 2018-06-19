@@ -133,7 +133,7 @@ def run(args):
     # print test-test1
     # print data['corr_obs']-test
 
-    test = unpack_and_stack('/home/bellini/Data/cfhtlens/preliminary/mockxipm.tar.gz')[1]
+    test = unpack_simulated_correlations('/home/bellini/Data/cfhtlens/preliminary/mockxipm.tar.gz')[1]
     test1 = unflatten_xipm(test)
     test1 = rsh.reshape_corr(test1, settings, data['mask_x_var'])
     # print test-test1

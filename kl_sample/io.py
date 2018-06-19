@@ -7,11 +7,11 @@ Functions defined here:
  - file_exists_or_error(fname)
  - folder_exists_or_create(fname)
  - read_param(fname, par, type)
- - unpack_and_stack(fname)
- - read_photo_z_data(fname)
  - read_from_fits(fname, name)
  - write_to_fits(fname, array, name)
  - print_info_fits(fname)
+ - unpack_simulated_correlations(fname)
+ - read_photo_z_data(fname)
 
 """
 
@@ -90,16 +90,15 @@ def file_exists_or_error(fname):
     raise IOError('File ' + abspath + ' not found!')
 
 
-
 def folder_exists_or_create(fname):
     """ Check if a folder exists, otherwise it creates it.
 
     Args:
         fname: path of the folder. If fname contains a file
-        name, it does creat only the folders containing it.
+        name, it does create only the folders containing it.
 
     Returns:
-        abspath: returns the absolute path of fname
+        abspath: return the absolute path of fname.
 
     """
 
@@ -186,68 +185,6 @@ def read_param(fname, par, type='string'):
         return value
 
 
-# ------------------- On preliminary data -------------------------------------#
-
-def unpack_and_stack(fname):
-    n_bins = len(set.Z_BINS)-1
-    mask_theta = np.array(set.MASK_THETA)
-    n_theta_masked = sum(1 for x in mask_theta.flatten() if x)
-    base_name = 'mockxipm/xipm_cfhtlens_sub2real0001_maskCLW1_blind1_z1_z1_athena.dat'
-    tar = tarfile.open(fname, 'r')
-    n_sims, mod = np.divmod(sum(1 for x in tar.getmembers() if x.isreg()), n_bins*(n_bins+1)/2)
-    if mod != 0:
-        raise IOError('The number of files in ' + fname + ' is not correct!')
-    xipm_sims = np.zeros((n_sims, n_theta_masked*n_bins*(n_bins+1)/2))
-    xipm_w = np.zeros((n_sims, n_theta_masked*n_bins*(n_bins+1)/2))
-    for n_sim in range(n_sims):
-        for n_bin1 in range(n_bins):
-            for n_bin2 in range(n_bin1, n_bins):
-                pos = np.flip(np.arange(n_bins+1),0)[:n_bin1].sum()
-                pos = (pos + n_bin2 - n_bin1)*n_theta_masked
-                new_name = base_name.replace('real0001', 'real{0:04d}'.format(n_sim+1))
-                new_name = new_name.replace('z1_athena', 'z{0:01d}_athena'.format(n_bin1+1))
-                new_name = new_name.replace('blind1_z1', 'blind1_z{0:01d}'.format(n_bin2+1))
-                f = tar.extractfile(new_name)
-                if f:
-                    fd = np.loadtxt(f)
-                    xi = np.hstack((fd[:,1][mask_theta[0]], fd[:,2][mask_theta[1]]))
-                    w  = np.hstack((fd[:,7][mask_theta[0]], fd[:,7][mask_theta[1]]))
-                    for i, xi_val in enumerate(xi):
-                        xipm_sims[n_sim][pos+i] = xi_val
-                        xipm_w[n_sim][pos+i] = w[i]
-        if (n_sim+1)%100==0 or n_sim+1==n_sims:
-            print('----> Unpacked {}/{} correlation functions'.format(n_sim+1, n_sims))
-            sys.stdout.flush()
-    return xipm_sims, xipm_w
-
-
-
-def read_photo_z_data(fname):
-    hdul = fits.open(fname, memmap=True)
-    table = hdul['data'].data
-    image = hdul['PZ_full'].data
-    z_bins = np.array([[set.Z_BINS[n], set.Z_BINS[n+1]] for n in np.arange(len(set.Z_BINS)-1)])
-    sel_bins = np.array([set.get_mask(table, z_bins[n][0], z_bins[n][1]) for n in range(len(z_bins))])
-    photo_z = np.zeros((len(z_bins)+1,len(image[0])))
-    n_eff = np.zeros(len(z_bins))
-    sigma_g = np.zeros(len(z_bins))
-    photo_z[0] = (np.arange(len(image[0]))+1./2.)*set.CFHTlens_dZ
-    for n in range(len(z_bins)):
-        w_sum = table['weight'][sel_bins[n]].sum()
-        w2_sum = (table['weight'][sel_bins[n]]**2.).sum()
-        #TODO: Correct ellipticities
-        m = np.average(table['e1'][sel_bins[n]])
-        e1 = table['e1'][sel_bins[n]]/(1+m)
-        e2 = table['e2'][sel_bins[n]]-table['c2'][sel_bins[n]]/(1+m)
-        photo_z[n+1] = np.dot(table['weight'][sel_bins[n]], image[sel_bins[n]])/w_sum
-        n_eff[n] = w_sum**2/w2_sum/set.CFHTlens_A_eff
-        sigma_g[n] = np.dot(table['weight'][sel_bins[n]]**2., (e1**2. + e2**2.)/2.)/w2_sum
-        sigma_g[n] = sigma_g[n]**0.5
-        print('----> Completed bin {}/{}'.format(n+1, len(z_bins)))
-        sys.stdout.flush()
-    return photo_z, n_eff, sigma_g
-
-
 # ------------------- FITS files ----------------------------------------------#
 
 def read_from_fits(fname, name):
@@ -263,7 +200,6 @@ def read_from_fits(fname, name):
     """
     with fits.open(fname) as fn:
         return fn[name].data
-
 
 
 def write_to_fits(fname, array, name):
@@ -295,7 +231,6 @@ def write_to_fits(fname, array, name):
     return
 
 
-
 def print_info_fits(fname):
     """ Print on screen fits file info.
 
@@ -306,7 +241,127 @@ def print_info_fits(fname):
         None
 
     """
+
     with fits.open(fname) as hdul:
         print(hdul.info())
         sys.stdout.flush()
     return
+
+
+# ------------------- On preliminary data -------------------------------------#
+
+def unpack_simulated_correlations(fname):
+    """ Unpack a tar file containing the simulated
+        correlation functions and write them into
+        a single array.
+
+    Args:
+        fname: path of the input file.
+
+    Returns:
+        array with correlation functions.
+        array with weights of correlation functions.
+
+    """
+
+    # Import local variables from settings
+    n_bins = len(set.Z_BINS)-1
+    mask_theta = np.array(set.MASK_THETA)
+    n_theta = sum(1 for x in mask_theta.flatten() if x)
+
+    # Base name of each file inside the compressed tar
+    base_name = 'mockxipm/xipm_cfhtlens_sub2real0001_maskCLW1_blind1_z1_z1_athena.dat'
+    tar = tarfile.open(fname, 'r')
+
+    # Calculate how many simulations were run based on the number of files
+    n_sims, mod = np.divmod(sum(1 for x in tar.getmembers() if x.isreg()), n_bins*(n_bins+1)/2)
+    if mod != 0:
+        raise IOError('The number of files in ' + fname + ' is not correct!')
+    n_sims = 5 #TODO:remove this
+
+    # Initialize arrays
+    xipm_sims = np.zeros((n_sims, n_theta*n_bins*(n_bins+1)/2))
+    xipm_w = np.zeros((n_sims, n_theta*n_bins*(n_bins+1)/2))
+
+    # Main loop: scroll over each file and import data
+    for n_sim in range(n_sims):
+        for n_bin1 in range(n_bins):
+            for n_bin2 in range(n_bin1, n_bins):
+                # For each bin pair calculate the position on the final array
+                pos = np.flip(np.arange(n_bins+1),0)[:n_bin1].sum()
+                pos = (pos + n_bin2 - n_bin1)*n_theta
+                # Modify the base name to get the actual one
+                new_name = base_name.replace('real0001', 'real{0:04d}'.format(n_sim+1))
+                new_name = new_name.replace('z1_athena', 'z{0:01d}_athena'.format(n_bin1+1))
+                new_name = new_name.replace('blind1_z1', 'blind1_z{0:01d}'.format(n_bin2+1))
+                # Extract file and read it only if it is not None
+                f = tar.extractfile(new_name)
+                if f:
+                    fd = np.loadtxt(f)
+                    # Read xi_plus and xi_minus and stack them
+                    xi = np.hstack((fd[:,1][mask_theta[0]], fd[:,2][mask_theta[1]]))
+                    # Read weights
+                    w  = np.hstack((fd[:,7][mask_theta[0]], fd[:,7][mask_theta[1]]))
+                    # Write imported data on final array
+                    for i, xi_val in enumerate(xi):
+                        xipm_sims[n_sim][pos+i] = xi_val
+                        xipm_w[n_sim][pos+i] = w[i]
+
+        # Print progress message
+        if (n_sim+1)%100==0 or n_sim+1==n_sims:
+            print('----> Unpacked {}/{} correlation functions'.format(n_sim+1, n_sims))
+            sys.stdout.flush()
+
+    tar.close()
+
+    return xipm_sims, xipm_w
+
+
+def read_photo_z_data(fname):
+    """ Read CFHTlens data and calculate photo_z,
+        n_eff and sigma_g.
+
+    Args:
+        fname: path of the input file.
+
+    Returns:
+        arrays with photo_z, n_eff and sigma_g.
+
+    """
+
+    # Read from fits
+    hdul = fits.open(fname, memmap=True)
+    table = hdul['data'].data
+    image = hdul['PZ_full'].data
+    hdul.close()
+
+    # Local variables
+    z_bins = np.array([[set.Z_BINS[n], set.Z_BINS[n+1]] for n in np.arange(len(set.Z_BINS)-1)])
+    sel_bins = np.array([set.get_mask(table, z_bins[n][0], z_bins[n][1]) for n in range(len(z_bins))])
+    photo_z = np.zeros((len(z_bins)+1,len(image[0])))
+    n_eff = np.zeros(len(z_bins))
+    sigma_g = np.zeros(len(z_bins))
+    photo_z[0] = (np.arange(len(image[0]))+1./2.)*set.CFHTlens_dZ
+
+    # Main loop: for each bin calculate photo_z, n_eff and sigma_g
+    for n in range(len(z_bins)):
+        # Useful quantities TODO: Correct ellipticities
+        w_sum = table['weight'][sel_bins[n]].sum()
+        w2_sum = (table['weight'][sel_bins[n]]**2.).sum()
+        m = np.average(table['e1'][sel_bins[n]])
+        e1 = table['e1'][sel_bins[n]]/(1+m)
+        e2 = table['e2'][sel_bins[n]]-table['c2'][sel_bins[n]]/(1+m)
+
+        # photo_z
+        photo_z[n+1] = np.dot(table['weight'][sel_bins[n]], image[sel_bins[n]])/w_sum
+        # n_eff
+        n_eff[n] = w_sum**2/w2_sum/set.CFHTlens_A_eff
+        # sigma_g
+        sigma_g[n] = np.dot(table['weight'][sel_bins[n]]**2., (e1**2. + e2**2.)/2.)/w2_sum
+        sigma_g[n] = sigma_g[n]**0.5
+
+        # Print progress message
+        print('----> Completed bin {}/{}'.format(n+1, len(z_bins)))
+        sys.stdout.flush()
+
+    return photo_z, n_eff, sigma_g

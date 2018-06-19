@@ -49,7 +49,7 @@ def prep_real(args):
 
 
     # Read and reshape xipm from simulations
-    xipm, xipm_w = io.unpack_and_stack(fname=path['sims'])
+    xipm, xipm_w = io.unpack_simulated_correlations(fname=path['sims'])
     xipm = np.array([rsh.unflatten_xipm(x) for x in xipm])
     xipm_w = np.array([rsh.unflatten_xipm(x) for x in xipm_w])
     io.write_to_fits(fname=path['output'], array=xipm, name='xipm_sim')

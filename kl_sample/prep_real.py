@@ -33,19 +33,6 @@ def prep_real(args):
     }
 
 
-    # Angular separation (theta)
-    theta = np.array(set.THETA_ARCMIN)
-    io.write_to_fits(fname=path['output'], array=theta, name='theta')
-    # Mask for theta
-    mask_theta = set.MASK_THETA.astype(int)
-    io.write_to_fits(fname=path['output'], array=mask_theta, name='mask_theta')
-
-
-    # Area simulations for each field
-    A_eff = set.A_sims
-    io.write_to_fits(fname=path['output'], array=A_eff, name='A_sims')
-
-
     # Read and reshape xipm observed
     xipm = np.loadtxt(path['xipm'], dtype='float64')[:,1]
     xipm = io.demask_xipm(xipm, set.MASK_THETA)

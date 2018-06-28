@@ -32,12 +32,12 @@ def run(args):
 
     # Define absolute paths and check the existence of each required file
     path = {
-        'params'  : io.file_exists_or_error(args.params_file),
+        'params'  : io.path_exists_or_error(args.params_file),
         'data'    : io.read_param(args.params_file, 'data', type='path'),
         'output'  : io.read_param(args.params_file, 'output', type='path')
     }
-    io.file_exists_or_error(path['data'])
-    io.folder_exists_or_create(path['output'])
+    io.path_exists_or_error(path['data'])
+    io.path_exists_or_create(path['output'])
 
 
     # Create array with cosmo parameters
@@ -140,9 +140,9 @@ def run(args):
     covmat = np.cov(dc.T)
     test = np.loadtxt('/home/bellini/Data/cfhtlens/preliminary/xipmcutcov_cfhtlens_sub2_4mask_regcomb_blind1_passfields_athenasj.dat')[:,2]
     test=test.reshape((280,280))
-    # print (covmat-test)/covmat
-    print covmat[0,0]
-    print test[0,0]
+    print np.diag((covmat-test)/test)
+    # print covmat[0,0]
+    # print test[0,0]
     # print (covmat-test)/covmat
     # print data['corr_sim_w'].shape
     # print data.keys()

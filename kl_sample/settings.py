@@ -34,16 +34,17 @@ Z_BINS = [0.15,0.29,0.43,0.57,0.70,0.90,1.10,1.30]
 
 
 # Angles of the correlation functions
-THETA_ARCMIN = [  1.41,  2.79,  5.53,  11.0,  21.7,  43.0,  85.2]
-MASK_THETA   = [
+THETA_ARCMIN = [  1.41,  2.79,  5.53,  11.0,  21.7,  43.0,  85.2] # in arcmin
+MASK_THETA   = np.array([
                [  True,  True,  True,  True,  True,  True, False],
                [ False, False, False,  True,  True,  True,  True]
-               ]
+               ])
 
 
-# CFHTlens specifications
-CFHTlens_dZ = 0.05
-CFHTlens_A_eff = 94.4*(60.**2.) #in arcmin^-2
+# CFHTlens specifications plus area of simulations
+dZ_CFHTlens = 0.05
+A_CFHTlens = np.array([42.90, 12.10, 26.10, 13.30])*(60.**2.) #in arcmin^-2
+A_sims = np.array([12.72, 10.31, 12.01, 10.38])*(60.**2.) #in arcmin^-2
 
 
 # Criteria used to select the data

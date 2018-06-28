@@ -31,30 +31,28 @@ def unflatten_xipm(array):
     n_bins = len(set.Z_BINS)-1
     n_theta = len(set.THETA_ARCMIN)
 
-    #Given the position in the file, find the corresponding position in the array
+    #Given the position in the array, find the corresponding position in the unflattened array
     def position_xipm(n, n_bins, n_theta):
-        # Local variables
-        n_theta_xip = np.array(set.MASK_THETA[0]).astype(int).sum()
-        n_theta_xim = np.array(set.MASK_THETA[1]).astype(int).sum()
         # Check that the input is consistent with these numbers
-        p_max = (n_theta_xip+n_theta_xim)*n_bins*(n_bins+1)/2
+        p_max = 2*n_theta*n_bins*(n_bins+1)/2
         if n>=p_max:
             raise ValueError("The input number is larger than expected!")
         # div: gives position of bins. mod: gives pm and theta
-        div, mod = np.divmod(n, n_theta_xip+n_theta_xim)
+        div, mod = np.divmod(n, 2*n_theta)
         # Calculate position of pm and theta
-        if mod<n_theta_xip:
+        if mod<n_theta:
             p_pm = 0
             p_theta = mod
         else:
             p_pm = 1
-            p_theta = 3+mod-n_theta_xip
+            p_theta = mod-n_theta
         # Calculate position of bin1 and bin2
         intervals = np.flip(np.array([np.arange(x,n_bins+1).sum() for x in np.arange(2,n_bins+2)]),0)
         p_bin_1 = np.where(intervals<=div)[0][-1]
         p_bin_2 = div - intervals[p_bin_1] + p_bin_1
 
         return p_pm, p_theta, p_bin_1, p_bin_2
+
 
     # Initialize array with xipm
     xipm = np.zeros((2, n_theta, n_bins, n_bins))

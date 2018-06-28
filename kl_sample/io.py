@@ -4,8 +4,8 @@ Module containing all the input/output related functions.
 
 Functions:
  - argument_parser()
- - file_exists_or_error(fname)
- - folder_exists_or_create(fname)
+ - path_exists_or_error(fname)
+ - path_exists_or_create(fname)
  - read_param(fname, par, type)
  - read_cosmo_array(fname, pars)
  - read_from_fits(fname, name)
@@ -20,7 +20,6 @@ import argparse
 import os
 import sys
 import re
-import tarfile
 import numpy as np
 from astropy.io import fits
 import settings as set
@@ -72,38 +71,38 @@ def argument_parser():
 
 # ------------------- Check existence -----------------------------------------#
 
-def file_exists_or_error(fname):
-    """ Check if a file exists, otherwise it returns error.
+def path_exists_or_error(path):
+    """ Check if a path exists, otherwise it returns error.
 
     Args:
-        fname: path of the file.
+        path: path to check.
 
     Returns:
         abspath: if the file exists it returns its absolute path
 
     """
 
-    abspath = os.path.abspath(fname)
+    abspath = os.path.abspath(path)
 
     if os.path.exists(abspath):
         return abspath
 
-    raise IOError('File ' + abspath + ' not found!')
+    raise IOError('Path ' + abspath + ' not found!')
 
 
-def folder_exists_or_create(fname):
-    """ Check if a folder exists, otherwise it creates it.
+def path_exists_or_create(path):
+    """ Check if a path exists, otherwise it creates it.
 
     Args:
-        fname: path of the folder. If fname contains a file
+        path: path to check. If path contains a file
         name, it does create only the folders containing it.
 
     Returns:
-        abspath: return the absolute path of fname.
+        abspath: return the absolute path of path.
 
     """
 
-    abspath = os.path.abspath(fname)
+    abspath = os.path.abspath(path)
     folder, _ = os.path.split(abspath)
 
     if not os.path.exists(folder):
@@ -284,6 +283,40 @@ def print_info_fits(fname):
 
 # ------------------- On preliminary data -------------------------------------#
 
+def demask_xipm(array, mask):
+    """ Convert a flatten masked array into
+        an unmasked one (still flatten).
+
+    Args:
+        array: array with the masked xipm.
+        mask: mask that has been used.
+
+    Returns:
+        array with demasked xipm.
+
+    """
+
+    # Flatten mask and tile mask
+    mask_f = mask.flatten()
+    # Get number of times that theta_pm should be repeated
+    div, mod = np.divmod(len(array), len(mask_f[mask_f]))
+    if mod != 0:
+        raise IOError('The number of files in ' + fname + ' is not correct!')
+    mask_f = np.tile(mask_f, div)
+
+    # Find positions where to write values
+    pos = np.where(mask_f)[0]
+
+    # Define unmasked array
+    xipm = np.zeros(len(mask_f))
+
+    # Assign components
+    for n1, n2 in enumerate(pos):
+        xipm[n2] = array[n1]
+
+    return xipm
+
+
 def unpack_simulated_xipm(fname):
     """ Unpack a tar file containing the simulated
         correlation functions and write them into
@@ -294,60 +327,48 @@ def unpack_simulated_xipm(fname):
 
     Returns:
         array with correlation functions.
-        array with weights of correlation functions.
 
     """
 
     # Import local variables from settings
     n_bins = len(set.Z_BINS)-1
-    mask_theta = np.array(set.MASK_THETA)
-    n_theta = sum(1 for x in mask_theta.flatten() if x)
+    n_theta = len(set.THETA_ARCMIN)
+    n_fields = len(set.A_CFHTlens)
 
     # Base name of each file inside the compressed tar
-    base_name = 'mockxipm/xipm_cfhtlens_sub2real0001_maskCLW1_blind1_z1_z1_athena.dat'
-    tar = tarfile.open(fname, 'r')
+    base_name = '/xipm_cfhtlens_sub2real0001_maskCLW1_blind1_z1_z1_athena.dat'
 
     # Calculate how many simulations were run based on the number of files
-    n_sims, mod = np.divmod(sum(1 for x in tar.getmembers() if x.isreg()), n_bins*(n_bins+1)/2)
+    nfiles = len(os.listdir(fname))
+    n_sims, mod = np.divmod(nfiles, n_fields*n_bins*(n_bins+1)/2)
     if mod != 0:
         raise IOError('The number of files in ' + fname + ' is not correct!')
 
-    # Initialize arrays
-    xipm_sims = np.zeros((n_sims, n_theta*n_bins*(n_bins+1)/2))
-    xipm_w = np.zeros((n_sims, n_theta*n_bins*(n_bins+1)/2))
+    # Initialize array
+    xipm_sims = np.zeros((n_fields, n_sims, 2*n_theta*n_bins*(n_bins+1)/2))
 
     # Main loop: scroll over each file and import data
-    for n_sim in range(n_sims):
-        for n_bin1 in range(n_bins):
-            for n_bin2 in range(n_bin1, n_bins):
-                # For each bin pair calculate the position on the final array
-                pos = np.flip(np.arange(n_bins+1),0)[:n_bin1].sum()
-                pos = (pos + n_bin2 - n_bin1)*n_theta
-                # Modify the base name to get the actual one
-                new_name = base_name.replace('real0001', 'real{0:04d}'.format(n_sim+1))
-                new_name = new_name.replace('z1_athena', 'z{0:01d}_athena'.format(n_bin1+1))
-                new_name = new_name.replace('blind1_z1', 'blind1_z{0:01d}'.format(n_bin2+1))
-                # Extract file and read it only if it is not None
-                f = tar.extractfile(new_name)
-                if f:
-                    fd = np.loadtxt(f)
+    for nf in range(n_fields):
+        for ns in range(n_sims):
+            for nb1 in range(n_bins):
+                for nb2 in range(nb1, n_bins):
+                    # Modify the base name to get the actual one
+                    new_name = base_name.replace('maskCLW1', 'maskCLW{0:01d}'.format(nf+1))
+                    new_name = new_name.replace('real0001', 'real{0:04d}'.format(ns+1))
+                    new_name = new_name.replace('z1_athena', 'z{0:01d}_athena'.format(nb1+1))
+                    new_name = new_name.replace('blind1_z1', 'blind1_z{0:01d}'.format(nb2+1))
+                    # For each bin pair calculate the position on the final array
+                    pos = np.flip(np.arange(n_bins+1),0)[:nb1].sum()
+                    pos = (pos + nb2 - nb1)*2*n_theta
+                    # Extract file and read it only if it is not None
+                    fn = np.loadtxt(fname+new_name)
                     # Read xi_plus and xi_minus and stack them
-                    xi = np.hstack((fd[:,1][mask_theta[0]], fd[:,2][mask_theta[1]]))
-                    # Read weights
-                    w  = np.hstack((fd[:,7][mask_theta[0]], fd[:,7][mask_theta[1]]))
+                    xi = np.hstack((fn[:,1], fn[:,2]))
                     # Write imported data on final array
                     for i, xi_val in enumerate(xi):
-                        xipm_sims[n_sim][pos+i] = xi_val
-                        xipm_w[n_sim][pos+i] = w[i]
+                        xipm_sims[nf, ns, pos+i] = xi_val
 
-        # Print progress message
-        if (n_sim+1)%100==0 or n_sim+1==n_sims:
-            print('----> Unpacked {}/{} correlation functions'.format(n_sim+1, n_sims))
-            sys.stdout.flush()
-
-    tar.close()
-
-    return xipm_sims, xipm_w
+    return xipm_sims
 
 
 def read_photo_z_data(fname):
@@ -374,7 +395,7 @@ def read_photo_z_data(fname):
     photo_z = np.zeros((len(z_bins)+1,len(image[0])))
     n_eff = np.zeros(len(z_bins))
     sigma_g = np.zeros(len(z_bins))
-    photo_z[0] = (np.arange(len(image[0]))+1./2.)*set.CFHTlens_dZ
+    photo_z[0] = (np.arange(len(image[0]))+1./2.)*set.dZ_CFHTlens
 
     # Main loop: for each bin calculate photo_z, n_eff and sigma_g
     for n in range(len(z_bins)):
@@ -388,7 +409,7 @@ def read_photo_z_data(fname):
         # photo_z
         photo_z[n+1] = np.dot(table['weight'][sel_bins[n]], image[sel_bins[n]])/w_sum
         # n_eff
-        n_eff[n] = w_sum**2/w2_sum/set.CFHTlens_A_eff
+        n_eff[n] = w_sum**2/w2_sum/set.A_CFHTlens.sum()
         # sigma_g
         sigma_g[n] = np.dot(table['weight'][sel_bins[n]]**2., (e1**2. + e2**2.)/2.)/w2_sum
         sigma_g[n] = sigma_g[n]**0.5

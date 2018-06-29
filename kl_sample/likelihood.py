@@ -35,7 +35,7 @@ def how_many_sims(data, settings):
     """
 
     # Total number of simulations available
-    tot_sims = len(data['corr_sim'])
+    tot_sims = settings['n_sims_tot']
 
     # If all simulations wanted, return it
     if settings['n_sims']=='all':
@@ -44,22 +44,22 @@ def how_many_sims(data, settings):
     # If auto, calculate how many sims should be used
     elif settings['n_sims']=='auto':
         # Number of angle data points
-        n_x_var = data['mask_x_var'].flatten()
-        n_x_var = len(n_x_var[n_x_var])
+        n_theta_ell = data['mask_theta_ell'].flatten()
+        n_theta_ell = len(n_theta_ell[n_theta_ell])
         # Number of bins
-        n_bins = len(data['photo_z'])-1
+        n_bins = settings['n_bins']
         # Total number of data points
-        tot_data = n_x_var*n_bins*(n_bins+1)/2
+        tot_data = n_theta_ell*n_bins*(n_bins+1)/2
         # Ratio to be kept fixed
         ratio = (tot_sims-tot_data-2.)/(tot_sims-1.)
         if settings['method']=='kl_off_diag':
             # Number of kl modes considered
             n_kl = settings['n_kl']
-            tot_data = n_x_var*n_kl*(n_kl+1)/2
+            tot_data = n_theta_ell*n_kl*(n_kl+1)/2
         elif settings['method']=='kl_diag':
             # Number of kl modes considered
             n_kl = settings['n_kl']
-            tot_data = n_x_var*n_kl
+            tot_data = n_theta_ell*n_kl
         return int(round((2.+tot_data-ratio)/(1.-ratio)))
 
     # If it is a number, just return it
@@ -82,14 +82,15 @@ def select_sims(data, settings):
 
     # Local variables
     n_sims = settings['n_sims']
+    n_sims_tot = settings['n_sims_tot']
+    n_fields = settings['n_fields']
 
     # Select simulations
-    rnd = random.sample(range(len(data['corr_sim'])), settings['n_sims'])
+    rnd = random.sample(range(n_sims_tot), n_sims)
     # Generate arrays of simulations and weights
-    sims = np.array([data['corr_sim'][x] for x in rnd])
-    sims_w = np.array([data['corr_sim_w'][x] for x in rnd])
+    sims = data['corr_sim'][:,rnd]
 
-    return sims, sims_w
+    return sims
 
 
 # ------------------- KL related ----------------------------------------------#

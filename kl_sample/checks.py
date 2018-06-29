@@ -165,8 +165,8 @@ def sanity_checks(cosmo, settings, path):
         # if n_sims is natural check that it is smaller than
         # the max n_sims we have
         if is_natural(settings['n_sims']):
-            test = int(settings['n_sims']) <= n_sims
-            assert test, 'n_sims has to be less than {}'.format(n_sims)
+            test = int(settings['n_sims']) <= n_sims and int(settings['n_sims']) > 1
+            assert test, 'n_sims has to be smaller than {} and larger than 1'.format(n_sims)
 
     # Checks related to the KL transform
     if settings['method'] in ['kl_diag', 'kl_off_diag']:

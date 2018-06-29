@@ -96,7 +96,8 @@ def run(args):
 
 
     # Add some dimension to settings (n_bins, n_x_var)
-    settings['n_fields'] = len(data['corr_sim'])
+    settings['n_fields'] = data['corr_sim'].shape[0]
+    settings['n_sims_tot'] = data['corr_sim'].shape[1]
     settings['n_bins'] = len(data['photo_z']) - 1
     settings['n_theta_ell'] = len(data['theta_ell'])
 
@@ -106,11 +107,11 @@ def run(args):
 
 
     # Compute how many simulations have to be used
-#     settings['n_sims'] = lkl.how_many_sims(data, settings)
-#     data['corr_sim'], data['corr_sim_w'] = lkl.select_sims(data, settings)
-#
-#
-#     # If KL
+    settings['n_sims'] = lkl.how_many_sims(data, settings)
+    data['corr_sim'] = lkl.select_sims(data, settings)
+
+
+    # If KL
 #     if settings['method'] in ['kl_off_diag', 'kl_diag']:
 #         # Compute KL transform
 #         data['kl_t'] = lkl.compute_kl(cosmo, data, settings)

@@ -13,6 +13,7 @@ import cosmo as cosmo_tools
 import checks
 import likelihood as lkl
 import reshape as rsh
+import settings as set
 
 
 def run(args):
@@ -68,6 +69,7 @@ def run(args):
     if settings['method'] in ['kl_diag', 'kl_off_diag']:
         settings['n_kl'] = io.read_param(path['params'], 'n_kl', type='int')
         settings['kl_scale_dep'] = io.read_param(path['params'], 'kl_scale_dep', type='bool')
+        settings['kl_on'] = io.read_param(path['params'], 'kl_on')
 
 
     # Check if there are unused parameters.
@@ -85,18 +87,18 @@ def run(args):
         'sigma_g' : io.read_from_fits(path['data'], 'sigma_g')
     }
     if settings['space']=='real':
-        data['x_var'] = io.read_from_fits(path['data'], 'theta')
-        data['mask_x_var'] = io.read_from_fits(path['data'], 'mask_theta').astype(bool)
+        data['theta_ell'] = np.array(set.THETA_ARCMIN)
+        data['mask_theta_ell'] = set.MASK_THETA
         data['corr_obs'] = io.read_from_fits(path['data'], 'xipm_obs')
         data['corr_sim'] = io.read_from_fits(path['data'], 'xipm_sim')
-        data['corr_sim_w'] = io.read_from_fits(path['data'], 'xipm_sim_w')
     elif settings['space']=='fourier':
         raise ValueError('Fourier space not implemented yet!')
 
 
     # Add some dimension to settings (n_bins, n_x_var)
+    settings['n_fields'] = len(data['corr_sim'])
     settings['n_bins'] = len(data['photo_z']) - 1
-    settings['n_x_var'] = len(data['x_var'])
+    settings['n_theta_ell'] = len(data['theta_ell'])
 
 
 
@@ -104,123 +106,123 @@ def run(args):
 
 
     # Compute how many simulations have to be used
-    settings['n_sims'] = lkl.how_many_sims(data, settings)
-    data['corr_sim'], data['corr_sim_w'] = lkl.select_sims(data, settings)
-
-
-    # If KL
-    if settings['method'] in ['kl_off_diag', 'kl_diag']:
-        # Compute KL transform
-        data['kl_t'] = lkl.compute_kl(cosmo, data, settings)
-        # Apply KL to observed correlation function
-        data['corr_obs'] = lkl.apply_kl(data['kl_t'], data['corr_obs'])
-        # Apply KL to simulated correlation functions
-        data['corr_sim'] = np.array([
-            lkl.apply_kl(data['kl_t'], data['corr_sim'][x])
-            for x in range(len(data['corr_sim']))])
-
-
-    # Reshape observed correlation function
-    data['corr_obs'] = rsh.flatten_xipm(data['corr_obs'], data['mask_x_var'], settings)
-
-    # Reshape simulated correlation functions and weights
-    data['corr_sim'] = np.array([rsh.flatten_xipm(
-        data['corr_sim'][x],
-        data['mask_x_var'],
-        settings
-        ) for x in range(len(data['corr_sim']))])
-    data['corr_sim_w'] = np.array([rsh.flatten_xipm(
-        data['corr_sim_w'][x],
-        data['mask_x_var'],
-        settings
-        ) for x in range(len(data['corr_sim_w']))])
-
-    avg = np.average(data['corr_sim'], axis=0)
-    dc = data['corr_sim']-avg
-    covmat = np.cov(dc.T)
-    test = np.loadtxt('/home/bellini/Data/cfhtlens/preliminary/xipmcutcov_cfhtlens_sub2_4mask_regcomb_blind1_passfields_athenasj.dat')[:,2]
-    test=test.reshape((280,280))
-    print np.diag((covmat-test)/test)
-    # print covmat[0,0]
-    # print test[0,0]
-    # print (covmat-test)/covmat
-    # print data['corr_sim_w'].shape
-    # print data.keys()
-
-#     # Reshape correlation functions
+#     settings['n_sims'] = lkl.how_many_sims(data, settings)
+#     data['corr_sim'], data['corr_sim_w'] = lkl.select_sims(data, settings)
 #
 #
-#
-#     # test = np.loadtxt('/home/bellini/Data/cfhtlens/preliminary/xipm.dat', dtype='float64')[:,1]
-#     # test1 = unflatten_xipm(test)
-#     # test1 = rsh.flatten_xipm(test1, data['mask_x_var'], settings)
-#     # print test.shape, test1.shape
-#     # print test-test1
-#     # print data['corr_obs']-test
-#
-#     test = unpack_simulated_xipm('/home/bellini/Data/cfhtlens/preliminary/mockxipm.tar.gz')[1]
-#     test1 = unflatten_xipm(test)
-#     test1 = rsh.flatten_xipm(test1, data['mask_x_var'], settings)
-#     # print test-test1
-#     # print data['corr_sim'][1]-test
+#     # If KL
+#     if settings['method'] in ['kl_off_diag', 'kl_diag']:
+#         # Compute KL transform
+#         data['kl_t'] = lkl.compute_kl(cosmo, data, settings)
+#         # Apply KL to observed correlation function
+#         data['corr_obs'] = lkl.apply_kl(data['kl_t'], data['corr_obs'])
+#         # Apply KL to simulated correlation functions
+#         data['corr_sim'] = np.array([
+#             lkl.apply_kl(data['kl_t'], data['corr_sim'][x])
+#             for x in range(len(data['corr_sim']))])
 #
 #
+#     # Reshape observed correlation function
+#     data['corr_obs'] = rsh.flatten_xipm(data['corr_obs'], data['mask_x_var'], settings)
 #
-#     # Compute covariance matrix (and its inverse)
-#     data['cov_mat'], data['inv_cov_mat'] = lkl.compute_covmat(data, settings)
+#     # Reshape simulated correlation functions and weights
+#     data['corr_sim'] = np.array([rsh.flatten_xipm(
+#         data['corr_sim'][x],
+#         data['mask_x_var'],
+#         settings
+#         ) for x in range(len(data['corr_sim']))])
+#     data['corr_sim_w'] = np.array([rsh.flatten_xipm(
+#         data['corr_sim_w'][x],
+#         data['mask_x_var'],
+#         settings
+#         ) for x in range(len(data['corr_sim_w']))])
 #
-#
-#     # print data['cov_mat'].shape
-#     # print test-data['cov_mat']
-#     # print test
-#     print data['cov_mat'][0]
-#
-#
-#
-#
-#
-#
-#     # print test[0,0]
-#     # print data['cov_mat'][0,0]
-#     # print (test[0,0]-data['cov_mat'][0,0])/data['cov_mat'][0,0]
-#
-#
-#
-#
-#     # # print position_xipm(1)
-#     # test = range(280)
-#     # test1 = unflatten_xipm(test)
-#     # test1 = rsh.flatten_xipm(test1, data['mask_x_var'], settings)
-#     # print test1
-#     # print test1.shape
-#
-#
-#     # # flatxipm = rsh.flatten_xipm(xipm, data['mask_x_var'], settings)
-#
-#     # print data['corr_sim'].shape
-#     # print test[1]-data['corr_sim'][1]
-#     # print test[0]
+#     avg = np.average(data['corr_sim'], axis=0)
+#     dc = data['corr_sim']-avg
+#     covmat = np.cov(dc.T)
+#     test = np.loadtxt('/home/bellini/Data/cfhtlens/preliminary/xipmcutcov_cfhtlens_sub2_4mask_regcomb_blind1_passfields_athenasj.dat')[:,2]
+#     test=test.reshape((280,280))
+#     print np.diag((covmat-test)/test)
 #     # print covmat[0,0]
-#     # print data['cov_mat'][0,0]
-#     # print (covmat/data['cov_mat']-1).max()
+#     # print test[0,0]
+#     # print (covmat-test)/covmat
+#     # print data['corr_sim_w'].shape
+#     # print data.keys()
 #
-#
-#     # # print data['corr_obs']
-#     # xipm = np.loadtxt('/home/bellini/Data/cfhtlens/preliminary/xipm.dat', dtype='float64')
-#     # xipm = unflatten_xipm(xipm[:,1])
-#     # # flatxipm = rsh.flatten_xipm(xipm, data['mask_x_var'], settings)
-#     # # print flatxipm
-#     # print data['corr_obs']/xipm-1.
-#
-#
-#     # print data['kl_t']
-#     # print path
-#     # print cosmo
-#     # print settings
-#
-#     return
-#
-# # Preliminary calculations
-# # - Compute inverse cov_mat
-#
-# # Run (input: array with cosmo_params, kl_t, corr_obs, inv_cov_mat)
+# #     # Reshape correlation functions
+# #
+# #
+# #
+# #     # test = np.loadtxt('/home/bellini/Data/cfhtlens/preliminary/xipm.dat', dtype='float64')[:,1]
+# #     # test1 = unflatten_xipm(test)
+# #     # test1 = rsh.flatten_xipm(test1, data['mask_x_var'], settings)
+# #     # print test.shape, test1.shape
+# #     # print test-test1
+# #     # print data['corr_obs']-test
+# #
+# #     test = unpack_simulated_xipm('/home/bellini/Data/cfhtlens/preliminary/mockxipm.tar.gz')[1]
+# #     test1 = unflatten_xipm(test)
+# #     test1 = rsh.flatten_xipm(test1, data['mask_x_var'], settings)
+# #     # print test-test1
+# #     # print data['corr_sim'][1]-test
+# #
+# #
+# #
+# #     # Compute covariance matrix (and its inverse)
+# #     data['cov_mat'], data['inv_cov_mat'] = lkl.compute_covmat(data, settings)
+# #
+# #
+# #     # print data['cov_mat'].shape
+# #     # print test-data['cov_mat']
+# #     # print test
+# #     print data['cov_mat'][0]
+# #
+# #
+# #
+# #
+# #
+# #
+# #     # print test[0,0]
+# #     # print data['cov_mat'][0,0]
+# #     # print (test[0,0]-data['cov_mat'][0,0])/data['cov_mat'][0,0]
+# #
+# #
+# #
+# #
+# #     # # print position_xipm(1)
+# #     # test = range(280)
+# #     # test1 = unflatten_xipm(test)
+# #     # test1 = rsh.flatten_xipm(test1, data['mask_x_var'], settings)
+# #     # print test1
+# #     # print test1.shape
+# #
+# #
+# #     # # flatxipm = rsh.flatten_xipm(xipm, data['mask_x_var'], settings)
+# #
+# #     # print data['corr_sim'].shape
+# #     # print test[1]-data['corr_sim'][1]
+# #     # print test[0]
+# #     # print covmat[0,0]
+# #     # print data['cov_mat'][0,0]
+# #     # print (covmat/data['cov_mat']-1).max()
+# #
+# #
+# #     # # print data['corr_obs']
+# #     # xipm = np.loadtxt('/home/bellini/Data/cfhtlens/preliminary/xipm.dat', dtype='float64')
+# #     # xipm = unflatten_xipm(xipm[:,1])
+# #     # # flatxipm = rsh.flatten_xipm(xipm, data['mask_x_var'], settings)
+# #     # # print flatxipm
+# #     # print data['corr_obs']/xipm-1.
+# #
+# #
+# #     # print data['kl_t']
+# #     # print path
+# #     # print cosmo
+# #     # print settings
+# #
+# #     return
+# #
+# # # Preliminary calculations
+# # # - Compute inverse cov_mat
+# #
+# # # Run (input: array with cosmo_params, kl_t, corr_obs, inv_cov_mat)

@@ -283,40 +283,6 @@ def print_info_fits(fname):
 
 # ------------------- On preliminary data -------------------------------------#
 
-def demask_xipm(array, mask):
-    """ Convert a flatten masked array into
-        an unmasked one (still flatten).
-
-    Args:
-        array: array with the masked xipm.
-        mask: mask that has been used.
-
-    Returns:
-        array with demasked xipm.
-
-    """
-
-    # Flatten mask and tile mask
-    mask_f = mask.flatten()
-    # Get number of times that theta_pm should be repeated
-    div, mod = np.divmod(len(array), len(mask_f[mask_f]))
-    if mod != 0:
-        raise IOError('The number of files in ' + fname + ' is not correct!')
-    mask_f = np.tile(mask_f, div)
-
-    # Find positions where to write values
-    pos = np.where(mask_f)[0]
-
-    # Define unmasked array
-    xipm = np.zeros(len(mask_f))
-
-    # Assign components
-    for n1, n2 in enumerate(pos):
-        xipm[n2] = array[n1]
-
-    return xipm
-
-
 def unpack_simulated_xipm(fname):
     """ Unpack a tar file containing the simulated
         correlation functions and write them into

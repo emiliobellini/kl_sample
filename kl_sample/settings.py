@@ -2,6 +2,9 @@
 
 General settings: default variables.
 
+WARNING: if you modify this file you may
+have to rerun prep_real.py or prep_fourier.py.
+
 """
 
 import numpy as np
@@ -18,6 +21,7 @@ default_params = {
     'method'        : 'full',
     'n_kl'          : 7,
     'kl_scale_dep'  : False,
+    'kl_on'         : 'fourier',
     'n_sims'        : 'auto',
     'sampler'       : 'single_point',
     'n_walkers'     : 10,

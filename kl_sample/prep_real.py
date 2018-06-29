@@ -35,7 +35,7 @@ def prep_real(args):
 
     # Read and reshape xipm observed
     xipm = np.loadtxt(path['xipm'], dtype='float64')[:,1]
-    xipm = io.demask_xipm(xipm, set.MASK_THETA)
+    xipm = rsh.unmask_xipm(xipm, set.MASK_THETA)
     xipm = rsh.unflatten_xipm(xipm)
     io.write_to_fits(fname=path['output'], array=xipm, name='xipm_obs')
 

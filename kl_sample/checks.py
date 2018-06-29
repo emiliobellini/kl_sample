@@ -14,6 +14,7 @@ import re
 import sys
 import numpy as np
 from astropy.io import fits
+import settings as set
 
 
 
@@ -133,7 +134,7 @@ def sanity_checks(cosmo, settings, path):
             assert test, name + ' was not found in the data file!'
         # Checks related to real space
         if settings['space']=='real':
-            for name in ['THETA', 'MASK_THETA', 'XIPM_OBS', 'XIPM_SIM']:
+            for name in ['XIPM_OBS', 'XIPM_SIM']:
                 test = name in imgs
                 assert test, name + ' was not found in data file!'
         # Checks related to real space
@@ -152,18 +153,13 @@ def sanity_checks(cosmo, settings, path):
         test = hdul['SIGMA_G'].shape == (n_bins,)
         assert test, 'sigma_g has wrong dimensions!'
         if settings['space']=='real':
-            n_theta = hdul['THETA'].shape[0]
-            n_sims = hdul['XIPM_SIM'].shape[0]
-            # theta
-            test = len(hdul['THETA'].shape) == 1
-            assert test, 'theta has wrong dimensions!'
-            # mask_theta
-            test = hdul['MASK_THETA'].shape == (2,n_theta)
-            assert test, 'mask_theta has wrong dimensions!'
+            n_theta = len(set.THETA_ARCMIN)
+            n_fields = hdul['XIPM_SIM'].shape[0]
+            n_sims = hdul['XIPM_SIM'].shape[1]
             # xipm_obs
             test = hdul['XIPM_OBS'].shape == (2,n_theta,n_bins,n_bins)
             assert test, 'xipm_obs has wrong dimensions!'
-            test = hdul['XIPM_SIM'].shape == (n_sims,2,n_theta,n_bins,n_bins)
+            test = hdul['XIPM_SIM'].shape == (n_fields, n_sims,2,n_theta,n_bins,n_bins)
             assert test, 'xipm_sim has wrong dimensions!'
 
         # if n_sims is natural check that it is smaller than
@@ -177,10 +173,13 @@ def sanity_checks(cosmo, settings, path):
         # n_kl
         test = settings['n_kl'] > 0 and settings['n_kl'] <= n_bins
         assert test, 'n_kl should be at least 1 and at most {}'.format(n_bins)
-        # kl_scale_dep can be true only in Fourier space
+        # kl_on
+        test = settings['kl_on'] in ['real', 'fourier']
+        assert test, 'kl_on not recognized! Options: real, fourier'
+        # if kl_scale_dep check that space and kl_on are the same
         if settings['kl_scale_dep']:
-            test = settings['space'] == 'fourier'
-            assert test, 'KL transform can be scale dependent only in Fourier space'
+            test = settings['space'] == settings['kl_on']
+            assert test, 'KL transform can be scale dependent only if space == kl_on'
 
     return
 

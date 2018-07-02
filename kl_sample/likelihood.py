@@ -17,6 +17,8 @@ import math
 import random
 import cosmo as cosmo_tools
 import checks
+import reshape as rsh
+import settings as set
 
 
 
@@ -154,8 +156,9 @@ def compute_kl(cosmo, data, settings):
         return E_avg
 
 
-def apply_kl(kl_t, corr):
-    """ Apply the KL transform to the correlation function.
+def apply_kl(kl_t, corr, settings):
+    """ Apply the KL transform to the correlation function
+        and reduce number of dimensions.
 
     Args:
         kl_t: KL transform.
@@ -166,14 +169,23 @@ def apply_kl(kl_t, corr):
 
     """
 
+    # Apply KL transform
     corr_kl = kl_t.dot(corr).dot(kl_t.T)
-    return np.transpose(corr_kl, axes=[1, 2, 0, 3])
+    corr_kl = np.transpose(corr_kl, axes=[1, 2, 0, 3])
+
+    # Reduce dimensions of the array
+    n_kl = settings['n_kl']
+    corr_kl = corr_kl[:,:,:n_kl,:n_kl]
+    if settings['method'] == 'kl_diag':
+        corr_kl = np.diagonal(corr_kl,  axis1=2, axis2=3)
+
+    return corr_kl
 
 
 # ------------------- Covmat --------------------------------------------------#
 
-def compute_covmat(data, settings):
-    """ Compute covariance matrix and its inverse.
+def compute_inv_covmat(data, settings):
+    """ Compute inverse covariance matrix.
 
     Args:
         data: dictionary containing the data stored
@@ -185,16 +197,26 @@ def compute_covmat(data, settings):
     """
 
     # Local variables
+    n_fields = settings['n_fields']
     n_sims = settings['n_sims']
-    n_data = data['corr_sim'].shape[1]
-    # Select simulations
-    rnd = random.sample(range(len(data['corr_sim'])), settings['n_sims'])
-    sims = np.array([data['corr_sim'][x] for x in rnd])
+    n_data = data['corr_sim'].shape[2]
+    A_c = set.A_CFHTlens
+    A_s = set.A_sims
+    corr = data['corr_sim']
 
-    # Compute covariance matrix
-    cov_mat = np.cov(sims.T)
+    # Compute inverse covariance matrix
+    cov = np.empty((n_fields, n_data, n_data))
+    inv_cov_tot = np.zeros((n_data, n_data))
+    for nf in range(n_fields):
+        cov[nf] = np.cov(corr[nf].T)
+        inv_cov_tot = inv_cov_tot + A_c[nf]/A_s[nf]*np.linalg.inv(cov[nf])
 
-    # Compute inverse
-    inv_cov_mat = (n_sims-n_data-2.)/(n_sims-1.)*np.linalg.inv(cov_mat)
+    # Invert and mask
+    cov_tot = np.linalg.inv(inv_cov_tot)
+    cov_tot = rsh.mask_xipm(cov_tot, data['mask_theta_ell'], settings)
+    cov_tot = rsh.mask_xipm(cov_tot.T, data['mask_theta_ell'], settings)
 
-    return cov_mat, inv_cov_mat
+    # Add overall normalization
+    inv_cov_tot = (n_sims-n_data-2.)/(n_sims-1.)*np.linalg.inv(cov_tot)
+
+    return inv_cov_tot

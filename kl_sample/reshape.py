@@ -18,6 +18,42 @@ import settings as set
 
 # ------------------- Flatten and unflatten correlation function --------------#
 
+    #Given the position in the array, find the corresponding position in the unflattened array
+def position_xipm(n, n_bins, n_theta):
+    """ Given the position in the array, find the
+        corresponding position in the unflattened array.
+
+    Args:
+        n: position in the flattened array.
+        n_bins: number of bins.
+        n_theta: number of theta_ell variables.
+
+    Returns:
+        p_pm, p_theta, p_bin_1, p_bin_2.
+
+    """
+
+    # Check that the input is consistent with these numbers
+    p_max = 2*n_theta*n_bins*(n_bins+1)/2
+    if n>=p_max:
+        raise ValueError("The input number is larger than expected!")
+    # div: gives position of bins. mod: gives pm and theta
+    div, mod = np.divmod(n, 2*n_theta)
+    # Calculate position of pm and theta
+    if mod<n_theta:
+        p_pm = 0
+        p_theta = mod
+    else:
+        p_pm = 1
+        p_theta = mod-n_theta
+    # Calculate position of bin1 and bin2
+    intervals = np.flip(np.array([np.arange(x,n_bins+1).sum() for x in np.arange(2,n_bins+2)]),0)
+    p_bin_1 = np.where(intervals<=div)[0][-1]
+    p_bin_2 = div - intervals[p_bin_1] + p_bin_1
+
+    return p_pm, p_theta, p_bin_1, p_bin_2
+
+
 def unflatten_xipm(array):
     """ Unflatten the correlation function.
 
@@ -33,29 +69,6 @@ def unflatten_xipm(array):
     n_bins = len(set.Z_BINS)-1
     n_theta = len(set.THETA_ARCMIN)
 
-    #Given the position in the array, find the corresponding position in the unflattened array
-    def position_xipm(n, n_bins, n_theta):
-        # Check that the input is consistent with these numbers
-        p_max = 2*n_theta*n_bins*(n_bins+1)/2
-        if n>=p_max:
-            raise ValueError("The input number is larger than expected!")
-        # div: gives position of bins. mod: gives pm and theta
-        div, mod = np.divmod(n, 2*n_theta)
-        # Calculate position of pm and theta
-        if mod<n_theta:
-            p_pm = 0
-            p_theta = mod
-        else:
-            p_pm = 1
-            p_theta = mod-n_theta
-        # Calculate position of bin1 and bin2
-        intervals = np.flip(np.array([np.arange(x,n_bins+1).sum() for x in np.arange(2,n_bins+2)]),0)
-        p_bin_1 = np.where(intervals<=div)[0][-1]
-        p_bin_2 = div - intervals[p_bin_1] + p_bin_1
-
-        return p_pm, p_theta, p_bin_1, p_bin_2
-
-
     # Initialize array with xipm
     xipm = np.zeros((2, n_theta, n_bins, n_bins))
     # Main loop: scroll all elements of the flattened array and reshape them
@@ -69,64 +82,75 @@ def unflatten_xipm(array):
     return xipm
 
 
-def flatten_xipm(corr, mask, settings):
-    """ Reshape the correlation function.
+def flatten_xipm(corr, settings):
+    """ Flatten the correlation function.
 
     Args:
         corr: correlation function.
-        mask: mask for the angle theta.
         settings: dictionary with settings.
 
     Returns:
-        reshaped correlation function.
+        flattened correlation function.
 
     """
 
     # Local variables
-    n_x_var = settings['n_x_var']
-    n_bins = settings['n_bins']
-
-    # Join together pm and theta indices
-    data_r = corr.reshape((2*n_x_var, n_bins, n_bins))
-    # Mask unused theta
-    data_r = data_r[mask.flatten()]
-    # Remove symmetric elements in bin1 and bin2
-    data_r = np.triu(data_r)
-
-    # If KL
+    n_theta_ell = settings['n_theta_ell']
     if settings['method'] in ['kl_off_diag', 'kl_diag']:
-        n_kl = settings['n_kl']
-        # keep only the first n_kl bins
-        data_r = data_r[:,:n_kl,:n_kl]
-        if settings['method'] == 'kl_diag':
-            # If diagonal, diagonalize in bin1 and bin2
-            data_r = np.diagonal(data_r,  axis1=1, axis2=2)
+        n_bins = settings['n_kl']
+    else:
+        n_bins = settings['n_bins']
 
-    # Transpose array (bin1, bin2, pm_theta)
-    data_r = np.transpose(data_r, axes=[1,2,0])
-    # Flatten
-    data_r = data_r.flatten()
-    # Remove 0 elements (related to np.triu above)
-    data_r = data_r[data_r != 0]
+    # Flatten array
+    if settings['method'] in ['full', 'kl_off_diag']:
+        n_data = 2*n_theta_ell*n_bins*(n_bins+1)/2
+        data_f = np.empty(n_data)
+        for n in range(n_data):
+            p_pm, p_tl, p_b1, p_b2 = position_xipm(n, n_bins, n_theta_ell)
+            data_f[n] = corr[p_pm, p_tl, p_b1, p_b2]
+    else:
+        n_data = 2*n_theta_ell*n_bins
+        data_f = np.empty(n_data)
+        for n in range(n_data):
+            div, mod = np.divmod(n, 2*n_theta_ell)
+            if mod<n_theta_ell:
+                p_pm = 0
+                p_theta = mod
+            else:
+                p_pm = 1
+                p_theta = mod-n_theta_ell
+            p_bin = div
+            data_f[n] = corr[p_pm, p_theta, p_bin]
 
-    return data_r
+    return data_f
 
 
 # ------------------- Mask and Unmask correlation function --------------------#
 
-def mask_xipm(array, mask):
-    """ Convert a flatten unmasked array
-        into a masked one (still flatten).
+def mask_xipm(array, mask, settings):
+    """ Convert a unmasked array into a masked one.
 
     Args:
         array: array with the unmasked xipm.
         mask: mask that has been used.
+        settings: dictionary with settings.
 
     Returns:
         array with masked xipm.
 
     """
-    return
+
+    if settings['method'] in ['kl_off_diag', 'kl_diag']:
+        n_bins = settings['n_kl']
+    else:
+        n_bins = settings['n_bins']
+
+    if settings['method'] in ['full', 'kl_off_diag']:
+        mask_tot = np.tile(mask.flatten(),n_bins*(n_bins+1)/2)
+    else:
+        mask_tot = np.tile(mask.flatten(),n_bins)
+
+    return array[mask_tot]
 
 
 def unmask_xipm(array, mask):
@@ -146,8 +170,8 @@ def unmask_xipm(array, mask):
     mask_f = mask.flatten()
     # Get number of times that theta_pm should be repeated
     div, mod = np.divmod(len(array), len(mask_f[mask_f]))
-    if mod != 0:
-        raise IOError('The number of files in ' + fname + ' is not correct!')
+    if mod == 0:
+        raise IOError('The length of the input array is not correct!')
     mask_f = np.tile(mask_f, div)
 
     # Find positions where to write values

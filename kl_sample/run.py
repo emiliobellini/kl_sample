@@ -14,6 +14,7 @@ import checks
 import likelihood as lkl
 import reshape as rsh
 import settings as set
+import sampler
 
 
 def run(args):
@@ -63,8 +64,6 @@ def run(args):
         settings['n_threads'] = io.read_param(path['params'], 'n_threads', type='int')
     elif settings['sampler'] == 'fisher':
         raise ValueError('Fisher not implemented yet!')
-    elif settings['sampler'] == 'single_point':
-        raise ValueError('Single_point not implemented yet!')
     # KL settings
     if settings['method'] in ['kl_diag', 'kl_off_diag']:
         settings['n_kl'] = io.read_param(path['params'], 'n_kl', type='int')
@@ -149,5 +148,15 @@ def run(args):
     data['inv_cov_mat'] = lkl.compute_inv_covmat(data, settings)
 
 
-# #
-# # # Run (input: array with cosmo_params, kl_t, corr_obs, inv_cov_mat)
+
+    # ------------------- Run -------------------------------------------------#
+
+    if settings['sampler'] == 'emcee':
+        sampler.run_emcee(cosmo, data, settings, path)
+    elif settings['sampler'] == 'fisher':
+        sampler.run_fisher(cosmo, data, settings, path)
+    elif settings['sampler'] == 'single_point':
+        sampler.run_single_point(cosmo, data, settings, path)
+
+
+    print 'Success!!'

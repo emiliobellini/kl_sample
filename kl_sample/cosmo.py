@@ -13,6 +13,8 @@ Functions:
 
 import numpy as np
 import pyccl as ccl
+import reshape as rsh
+import likelihood as lkl
 
 
 
@@ -138,52 +140,63 @@ def get_xipm_ccl(cosmo, cls, theta):
 
 # ------------------- KL related ----------------------------------------------#
 
-# def get_theory(cosmo_params, settings, cosmo, data):
-#     """ Get theory correlation function or Cl's.
-#
-#     Args:
-#         var: array containing the varying cosmo parameters.
-#         settings: dictionary with all the settings used
-#         cosmo: dictionary containing cosmology names,
-#         values and mask
-#
-#     Returns:
-#         array with correlation function or Cl's.
-#
-#     """
-#
-    # # Get cosmological parameters
-    # var_tot = get_cosmo(var, cosmo)
-    # #Correlation function
-    # #Reshape and eventually KL transform
-    # if is_kl:
-    #     xi_th = kl_transform(xi_th, datat='corr')
-    # xi_th = reshape(xi_th, datat='corr')
-    # return xi_th
+def get_theory(var, full, mask, data, settings):
+    """ Get theory correlation function or Cl's.
+
+    Args:
+        var: array containing the varying cosmo parameters.
+        full: array containing all the cosmo parameters.
+        mask: array containing the mask for the cosmo parameters.
+        data: dictionary with all the data used
+        settings: dictionary with all the settings used
+
+    Returns:
+        array with correlation function or Cl's.
+
+    """
+
+    # Local variables
+    pz = data['photo_z']
+    theta = data['theta_ell']
+    ell_max = settings['ell_max']
+
+    # Merge in a single array varying and fixed parameters
+    pars = np.empty(len(mask))
+    count1 = 0
+    for count2 in range(len(pars)):
+        if not mask[count2]:
+            pars[count2] = full[count2][1]
+        else:
+            pars[count2] = var[count1]
+            count1 = count1+1
 
 
-# def get_cosmo(var, cosmo):
-#     """ Build an array with the full cosmological
-#         parameters.
-#
-#     Args:
-#         var: array containing the varying cosmo parameters.
-#         cosmo: dictionary containing cosmology names,
-#         values and mask
-#
-#     Returns:
-#         array with full cosmological parameters.
-#
-#     """
-#
-#     # Array with initial parameters
-#     params = cosmo['params'][:,1]
-#
-#     # Substitute all the varying parameters
-#     count1 = 0
-#     for count2 in range(len(params)):
-#         if cosmo['mask'][count2]:
-#             params[count2] = var[count1]
-#             count1 = count1 + 1
-#
-#     return params
+    # Get xipm
+    cosmo = get_cosmo_ccl(pars)
+    cls = get_cls_ccl(cosmo, pz, ell_max)
+    xipm = get_xipm_ccl(cosmo, cls, theta)
+
+    # Reshape xipm
+    if settings['method'] in ['kl_off_diag', 'kl_diag']:
+        xipm = lkl.apply_kl(data['kl_t'], xipm, settings)
+    xipm = rsh.flatten_xipm(xipm, settings)
+    xipm = rsh.mask_xipm(xipm, data['mask_theta_ell'], settings)
+
+    return xipm
+
+
+def get_sigma_8(var, full, mask):
+    # Merge in a single array varying and fixed parameters
+    pars = np.empty(len(mask))
+    count1 = 0
+    for count2 in range(len(pars)):
+        if not mask[count2]:
+            pars[count2] = full[count2][1]
+        else:
+            pars[count2] = var[count1]
+            count1 = count1+1
+    #Cosmology
+    cosmo = get_cosmo_ccl(pars)
+    sigma8 = ccl.sigma8(cosmo)
+
+    return sigma8

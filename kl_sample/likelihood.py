@@ -7,8 +7,8 @@ Functions:
  - how_many_sims(data, settings)
  - select_sims(data, settings)
  - compute_kl(cosmo, data, settings)
- - apply_kl(kl_t, corr)
- - compute_covmat(data, settings)
+ - apply_kl(kl_t, corr, settings)
+ - compute_inv_covmat(data, settings)
 
 """
 
@@ -220,3 +220,58 @@ def compute_inv_covmat(data, settings):
     inv_cov_tot = (n_sims-n_data-2.)/(n_sims-1.)*np.linalg.inv(cov_tot)
 
     return inv_cov_tot
+
+
+# ------------------- Likelihood ----------------------------------------------#
+
+def lnprior(var, full, mask):
+    """
+
+    Function containing the prior.
+
+    """
+
+    is_in = (full[mask][:,0] <= var).all()
+    is_in = is_in*(var <= full[mask][:,2]).all()
+
+    if is_in:
+        return 0.0
+    return -np.inf
+
+
+def lnlike(var, full, mask, data, settings):
+    """
+
+    Function containing the likelihood.
+
+    """
+
+    #Get theory
+    try:
+        th = cosmo_tools.get_theory(var, full, mask, data, settings)
+    except:
+        print 'CCL failure with pars = ' + str(var)
+        sys.stdout.flush()
+        return -np.inf
+
+    obs = data['corr_obs']
+    icov = data['inv_cov_mat']
+
+    #Get chi2
+    chi2 = (obs-th).dot(icov).dot(obs-th)
+    return -chi2/2.
+
+
+def lnprob(var, full, mask, data, settings):
+    """
+
+    Function containing the posterior.
+
+    """
+
+    lp = lnprior(var, full, mask)
+
+    if not np.isfinite(lp):
+        return -np.inf
+
+    return lp + lnlike(var, full, mask, data, settings)

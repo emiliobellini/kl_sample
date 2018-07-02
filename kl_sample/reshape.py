@@ -4,9 +4,10 @@ This module contains functions to reshape and manipulate
 the correlation function and power spectra.
 
 Functions:
+ - position_xipm(n, n_bins, n_theta)
  - unflatten_xipm(array)
- - flatten_xipm(corr, mask, settings)
- - mask_xipm(array, mask)
+ - flatten_xipm(corr, settings)
+ - mask_xipm(array, mask, settings)
  - unmask_xipm(array, mask)
 
 """

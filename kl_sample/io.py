@@ -4,8 +4,8 @@ Module containing all the input/output related functions.
 
 Functions:
  - argument_parser()
- - path_exists_or_error(fname)
- - path_exists_or_create(fname)
+ - path_exists_or_error(path)
+ - path_exists_or_create(path)
  - read_param(fname, par, type)
  - read_cosmo_array(fname, pars)
  - read_from_fits(fname, name)

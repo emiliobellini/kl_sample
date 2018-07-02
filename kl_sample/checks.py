@@ -121,9 +121,6 @@ def sanity_checks(cosmo, settings, path):
     # Checks related to the fisher sampler
     elif settings['sampler'] == 'fisher':
         raise ValueError('Fisher not implemented yet!')
-    # Checks related to the single_point sampler
-    elif settings['sampler'] == 'single_point':
-        raise ValueError('Single_point not implemented yet!')
 
     # Check data existence
     with fits.open(path['data']) as hdul:

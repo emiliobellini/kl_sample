@@ -104,6 +104,11 @@ def run(args):
 
 
     # ------------------- Preliminary computations ----------------------------#
+    # TODO:for now implemented only:
+    # - sampler = emcee
+    # - space = real
+    # - kl_scale_dep = no
+    # - kl_on = fourier
 
 
     # Compute how many simulations have to be used
@@ -112,17 +117,17 @@ def run(args):
 
 
     # If KL
-#     if settings['method'] in ['kl_off_diag', 'kl_diag']:
-#         # Compute KL transform
-#         data['kl_t'] = lkl.compute_kl(cosmo, data, settings)
-#         # Apply KL to observed correlation function
-#         data['corr_obs'] = lkl.apply_kl(data['kl_t'], data['corr_obs'])
-#         # Apply KL to simulated correlation functions
-#         data['corr_sim'] = np.array([
-#             lkl.apply_kl(data['kl_t'], data['corr_sim'][x])
-#             for x in range(len(data['corr_sim']))])
-#
-#
+    if settings['method'] in ['kl_off_diag', 'kl_diag']:
+        # Compute KL transform
+        data['kl_t'] = lkl.compute_kl(cosmo, data, settings)
+        # Apply KL to observed correlation function
+        data['corr_obs'] = lkl.apply_kl(data['kl_t'], data['corr_obs'])
+        # Apply KL to simulated correlation functions
+        for nf in range(settings['n_fields']):
+            for ns in range(settings['n_sims']):
+                data['corr_sim'][nf][ns] = lkl.apply_kl(data['kl_t'], data['corr_sim'][nf][ns])
+
+
 #     # Reshape observed correlation function
 #     data['corr_obs'] = rsh.flatten_xipm(data['corr_obs'], data['mask_x_var'], settings)
 #

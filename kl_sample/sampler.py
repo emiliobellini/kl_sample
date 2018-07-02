@@ -9,13 +9,16 @@ Functions:
 
 """
 
+import sys
+import numpy as np
+import emcee
 import likelihood as lkl
 import cosmo as cosmo_tools
 
 
 # ------------------- emcee ---------------------------------------------------#
 
-def run_emcee(cosmo, data, settings, path):
+def run_emcee(args, cosmo, data, settings, path):
     """ Run emcee sampler.
 
     Args:
@@ -28,6 +31,52 @@ def run_emcee(cosmo, data, settings, path):
         file with chains.
 
     """
+
+    # Local variables
+    full = cosmo['params']
+    mask = cosmo['mask']
+    obs = data['corr_obs']
+    icov = data['inv_cov_mat']
+    ns = settings['n_steps']
+    nw = settings['n_walkers']
+    nt = settings['n_threads']
+    nd = len(mask[mask])
+
+    #Print useful stuff
+    print 'Starting the chains!'
+    for key in settings.keys():
+        print key + ' = ' + str(settings[key])
+    sys.stdout.flush()
+
+    #Initialize sampler
+    sampler = emcee.EnsembleSampler(nw, nd, lkl.lnprob, args=[full, mask, data, settings], threads=nt)
+
+
+    if args.restart:
+        # Initial point from data
+        vars_0 = np.loadtxt(path['output'],unpack=True)
+        vars_0 = vars_0[2:2+nd]
+        vars_0 = vars_0[:,-nw:].T
+    else:
+        # Initial point
+        vars_0 = np.array([lkl.get_random(full[mask], 1.e1) for x in range(nw)])
+        # Create file
+        f = open(path['output'], 'w')
+        f.close()
+
+    for count, result in enumerate(sampler.sample(vars_0, iterations=ns, storechain=False)):
+        pos = result[0]
+        prob = result[1]
+        f = open(path['output'], 'a')
+        for k in range(pos.shape[0]):
+            out = np.append(np.array([1., -prob[k]]), pos[k])
+            out = np.append(out, cosmo_tools.get_sigma_8(pos[k], full, mask))
+            f.write('    '.join(['{0:.10e}'.format(x) for x in out]) + '\n')
+        f.close()
+        if (count+1) % 10 == 0:
+            print '----> Computed ' + '{0:5.1%}'.format(float(count+1) / ns) + ' of the steps'
+            sys.stdout.flush()
+
     return
 
 
@@ -51,7 +100,7 @@ def run_fisher(cosmo, data, settings, path):
 
 # ------------------- single_point --------------------------------------------#
 
-def run_single_point(cosmo, data, settings, path):
+def run_single_point(cosmo, data, settings):
     """ Run emcee sampler.
 
     Args:

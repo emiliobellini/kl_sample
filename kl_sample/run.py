@@ -152,11 +152,11 @@ def run(args):
     # ------------------- Run -------------------------------------------------#
 
     if settings['sampler'] == 'emcee':
-        sampler.run_emcee(cosmo, data, settings, path)
+        sampler.run_emcee(args, cosmo, data, settings, path)
     elif settings['sampler'] == 'fisher':
         sampler.run_fisher(cosmo, data, settings, path)
     elif settings['sampler'] == 'single_point':
-        sampler.run_single_point(cosmo, data, settings, path)
+        sampler.run_single_point(cosmo, data, settings)
 
 
     print 'Success!!'

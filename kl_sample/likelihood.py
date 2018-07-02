@@ -275,3 +275,29 @@ def lnprob(var, full, mask, data, settings):
         return -np.inf
 
     return lp + lnlike(var, full, mask, data, settings)
+
+
+def get_random(pars, squeeze):
+    """
+
+    Get random initial points.
+
+    """
+
+    rnd_pars = np.array([])
+    for count in range(len(pars)):
+        if pars[count][2] == None:
+            rb = np.inf
+        else:
+            rb = pars[count][2]
+        if pars[count][0] == None:
+            lb = -np.inf
+        else:
+            lb = pars[count][0]
+        if lb==-np.inf and rb==np.inf:
+            rnd = pars[count][1] + 2.*(np.random.rand()-.5)/squeeze
+        else:
+            rnd = pars[count][1] + 2.*(np.random.rand()-.5)*min(rb-pars[count][1], pars[count][1]-lb)/squeeze
+        rnd_pars = np.append(rnd_pars, rnd)
+
+    return rnd_pars

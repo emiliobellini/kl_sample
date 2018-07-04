@@ -122,7 +122,7 @@ def get_xipm_ccl(cosmo, cls, theta):
     # Local variables
     n_bins = cls.shape[-1]
     n_theta = len(theta)
-    ell = range(2,len(cls))
+    ell = np.arange(len(cls))
 
     # Main loop: compute correlation function for each bin pair
     xi_th = np.zeros((2, n_bins, n_bins, n_theta))

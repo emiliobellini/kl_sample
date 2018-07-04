@@ -73,9 +73,8 @@ def run_emcee(args, cosmo, data, settings, path):
             out = np.append(out, cosmo_tools.get_sigma_8(pos[k], full, mask))
             f.write('    '.join(['{0:.10e}'.format(x) for x in out]) + '\n')
         f.close()
-        if (count+1) % 10 == 0:
-            print '----> Computed ' + '{0:5.1%}'.format(float(count+1) / ns) + ' of the steps'
-            sys.stdout.flush()
+        print '----> Computed ' + '{0:5.1%}'.format(float(count+1) / ns) + ' of the steps'
+        sys.stdout.flush()
 
     return
 

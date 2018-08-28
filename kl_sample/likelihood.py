@@ -9,6 +9,10 @@ Functions:
  - compute_kl(cosmo, data, settings)
  - apply_kl(kl_t, corr, settings)
  - compute_inv_covmat(data, settings)
+ - lnprior(var, full, mask)
+ - lnlike(var, full, mask, data, settings)
+ - lnprob(var, full, mask, data, settings)
+ - get_random(pars, squeeze)
 
 """
 

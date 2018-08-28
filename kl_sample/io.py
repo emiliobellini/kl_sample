@@ -9,6 +9,7 @@ Functions:
  - read_param(fname, par, type)
  - read_cosmo_array(fname, pars)
  - read_from_fits(fname, name)
+ - read_header_from_fits(fname, name)
  - write_to_fits(fname, array, name)
  - print_info_fits(fname)
  - unpack_simulated_xipm(fname)
@@ -233,6 +234,21 @@ def read_from_fits(fname, name):
     """
     with fits.open(fname) as fn:
         return fn[name].data
+
+
+def read_header_from_fits(fname, name):
+    """ Open a fits file and read header from it.
+
+    Args:
+        fname: path of the data file.
+        name: name of the data we want to extract.
+
+    Returns:
+        header.
+
+    """
+    with fits.open(fname) as fn:
+        return fn[name].header
 
 
 def write_to_fits(fname, array, name):

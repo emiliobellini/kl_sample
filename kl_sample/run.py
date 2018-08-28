@@ -86,7 +86,7 @@ def run(args):
         'sigma_g' : io.read_from_fits(path['data'], 'sigma_g')
     }
     if settings['space']=='real':
-        data['theta_ell'] = np.array(set.THETA_ARCMIN)
+        data['theta_ell'] = np.array(set.THETA_ARCMIN)/60.
         data['mask_theta_ell'] = set.MASK_THETA
         data['corr_obs'] = io.read_from_fits(path['data'], 'xipm_obs')
         data['corr_sim'] = io.read_from_fits(path['data'], 'xipm_sim')

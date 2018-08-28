@@ -222,7 +222,8 @@ def compute_inv_covmat(data, settings):
     cov_tot = rsh.mask_xipm(cov_tot.T, data['mask_theta_ell'], settings)
 
     # Add overall normalization
-    inv_cov_tot = (n_sims-n_data-2.)/(n_sims-1.)*np.linalg.inv(cov_tot)
+    n_data_mask = cov_tot.shape[0]
+    inv_cov_tot = (n_sims-n_data_mask-2.)/(n_sims-1.)*np.linalg.inv(cov_tot)
 
     return inv_cov_tot
 

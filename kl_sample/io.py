@@ -50,12 +50,14 @@ def argument_parser():
         '(i) prep_real: prepare data in real space. '
         '(ii) prep_fourier: prepare data in fourier space. '
         '(iii) run: do the actual run. '
+        '(iv) get_kl: calculate the kl transformation '
         'Options (i) and (ii) are usually not necessary since '
         'the data are are already stored in this repository.')
 
     run_parser = subparsers.add_parser('run')
     prep_real_parser = subparsers.add_parser('prep_real')
     prep_fourier_parser = subparsers.add_parser('prep_fourier')
+    get_kl_parser = subparsers.add_parser('get_kl')
 
     #Arguments for 'run'
     run_parser.add_argument('params_file', type=str, help='Parameters file')
@@ -66,6 +68,8 @@ def argument_parser():
     prep_real_parser.add_argument('input_folder', type=str, help='Input folder')
     #Arguments for 'prep_fourier'
     prep_fourier_parser.add_argument('input_folder', type=str, help='Input folder')
+    #Arguments for 'get_kl'
+    get_kl_parser.add_argument('params_file', type=str, help='Parameters file')
 
     return parser.parse_args()
 

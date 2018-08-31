@@ -32,3 +32,6 @@ if __name__ == '__main__':
     if args.mode == 'run':
         from kl_sample.run import run
         sys.exit(run(args))
+    if args.mode == 'get_kl':
+        from kl_sample.get_kl import get_kl
+        sys.exit(get_kl(args))

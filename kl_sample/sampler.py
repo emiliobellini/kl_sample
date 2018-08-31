@@ -59,7 +59,7 @@ def run_emcee(args, cosmo, data, settings, path):
         vars_0 = vars_0[:,-nw:].T
     else:
         # Initial point
-        vars_0 = np.array([lkl.get_random(full[mask], 1.e1) for x in range(nw)])
+        vars_0 = np.array([lkl.get_random(full[mask], 1.e3) for x in range(nw)])
         # Create file
         f = open(path['output'], 'w')
         f.close()

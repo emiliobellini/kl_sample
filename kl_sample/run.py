@@ -55,7 +55,7 @@ def run(args):
         'space' : io.read_param(path['params'], 'space'),
         'method' : io.read_param(path['params'], 'method'),
         'ell_max' : io.read_param(path['params'], 'ell_max', type='int'),
-        'n_sims' : io.read_param(path['params'], 'n_sims'),
+        'n_sims' : io.read_param(path['params'], 'n_sims')
     }
     # Sampler settings
     if settings['sampler'] == 'emcee':

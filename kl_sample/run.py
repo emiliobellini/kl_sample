@@ -92,7 +92,8 @@ def run(args):
         data['corr_sim'] = io.read_from_fits(path['data'], 'xipm_sim')
     elif settings['space']=='fourier':
         raise ValueError('Fourier space not implemented yet!')
-
+    if settings['method'] in ['kl_diag', 'kl_off_diag']:
+        data['kl_t'] = io.read_from_fits(path['data'], 'kl_t')
 
     # Add some dimension to settings (n_bins, n_x_var)
     settings['n_fields'] = data['corr_sim'].shape[0]
@@ -117,8 +118,6 @@ def run(args):
 
     # If KL
     if settings['method'] in ['kl_off_diag', 'kl_diag']:
-        # Compute KL transform
-        data['kl_t'] = lkl.compute_kl(cosmo, data, settings)
         # Apply KL to observed correlation function
         data['corr_obs'] = lkl.apply_kl(data['kl_t'], data['corr_obs'], settings)
         # Apply KL to simulated correlation functions

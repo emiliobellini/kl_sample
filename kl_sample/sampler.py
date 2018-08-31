@@ -48,9 +48,14 @@ def run_emcee(args, cosmo, data, settings, path):
         print key + ' = ' + str(settings[key])
     sys.stdout.flush()
 
+
+
     #Initialize sampler
     sampler = emcee.EnsembleSampler(nw, nd, lkl.lnprob, args=[full, mask, data, settings], threads=nt)
 
+#    def local_lnprob(var):
+#        return lkl.lnprob(var, full, mask, data, settings)
+#    sampler = emcee.EnsembleSampler(nw, nd, local_lnprob, threads=nt)
 
     if args.restart:
         # Initial point from data
@@ -60,21 +65,57 @@ def run_emcee(args, cosmo, data, settings, path):
     else:
         # Initial point
         vars_0 = np.array([lkl.get_random(full[mask], 1.e1) for x in range(nw)])
+        vars_0 = np.array(np.repeat(np.array([full[mask][:,1]]),nw,axis=0))
+        print vars_0
         # Create file
         f = open(path['output'], 'w')
         f.close()
 
+#    for count in range(nw):
+#        print count
+#        sys.stdout.flush()
+#        var = vars_0[count]
+#        print var
+#        sys.stdout.flush()
+#        prob = local_lnprob(var)
+#        print prob
+#        sys.stdout.flush()
+#    print 'Done prob!'
+#    sys.stdout.flush()
+
+#    sampler.run_mcmc(vars_0, ns)
+#    print 'Done run_mcmc'
+#    sys.stdout.flush()
+
+
     for count, result in enumerate(sampler.sample(vars_0, iterations=ns, storechain=False)):
+        print 'Inside loop'
+        sys.stdout.flush()
         pos = result[0]
         prob = result[1]
-        f = open(path['output'], 'a')
-        for k in range(pos.shape[0]):
-            out = np.append(np.array([1., -prob[k]]), pos[k])
-            out = np.append(out, cosmo_tools.get_sigma_8(pos[k], full, mask))
-            f.write('    '.join(['{0:.10e}'.format(x) for x in out]) + '\n')
-        f.close()
-        print '----> Computed ' + '{0:5.1%}'.format(float(count+1) / ns) + ' of the steps'
+        print count
         sys.stdout.flush()
+        print pos
+        sys.stdout.flush()
+        print prob
+        sys.stdout.flush()
+
+    print 'Done loop'
+    sys.stdout.flush()
+
+#    for count, result in enumerate(sampler.sample(vars_0, iterations=1, storechain=False)):
+#        print 'Inside loop'
+#        sys.stdout.flush()
+#        pos = result[0]
+#        prob = result[1]
+#        f = open(path['output'], 'a')
+#        for k in range(pos.shape[0]):
+#            out = np.append(np.array([1., -prob[k]]), pos[k])
+#            out = np.append(out, cosmo_tools.get_sigma_8(pos[k], full, mask))
+#            f.write('    '.join(['{0:.10e}'.format(x) for x in out]) + '\n')
+#        f.close()
+#        print '----> Computed ' + '{0:5.1%}'.format(float(count+1) / ns) + ' of the steps'
+#        sys.stdout.flush()
 
     return
 

@@ -97,12 +97,16 @@ def get_cls_ccl(cosmo, pz, ell_max):
     # Cl's
     ell = np.arange(n_ells)
     cls = np.zeros((n_bins, n_bins, n_ells))
-    for count1 in range(n_bins):
-        for count2 in range(count1,n_bins):
-            cls[count1,count2] = ccl.angular_cl(cosmo, lens[count1], lens[count2], ell)
-            cls[count2,count1] = cls[count1,count2]
-    cls = np.transpose(cls,axes=[2,0,1])
-
+    print type(cosmo)
+    print type(lens[0])
+    print type(ell)
+    ccl.angular_cl(cosmo, lens[0], lens[0], ell)
+    #for count1 in range(n_bins):
+    #    for count2 in range(count1,n_bins):
+    #        cls[count1,count2] = ccl.angular_cl(cosmo, lens[count1], lens[count2], ell)
+    #        cls[count2,count1] = cls[count1,count2]
+    #cls = np.transpose(cls,axes=[2,0,1])
+    cls = np.ones((2000,7,7))
     return cls
 
 
@@ -174,13 +178,14 @@ def get_theory(var, full, mask, data, settings):
     # Get xipm
     cosmo = get_cosmo_ccl(pars)
     cls = get_cls_ccl(cosmo, pz, ell_max)
-    xipm = get_xipm_ccl(cosmo, cls, theta)
+    #xipm = get_xipm_ccl(cosmo, cls, theta)
 
     # Reshape xipm
-    if settings['method'] in ['kl_off_diag', 'kl_diag']:
-        xipm = lkl.apply_kl(data['kl_t'], xipm, settings)
-    xipm = rsh.flatten_xipm(xipm, settings)
-    xipm = rsh.mask_xipm(xipm, data['mask_theta_ell'], settings)
+    #if settings['method'] in ['kl_off_diag', 'kl_diag']:
+    #    xipm = lkl.apply_kl(data['kl_t'], xipm, settings)
+    #xipm = rsh.flatten_xipm(xipm, settings)
+    #xipm = rsh.mask_xipm(xipm, data['mask_theta_ell'], settings)
+    xipm = np.zeros(280)
 
     return xipm
 

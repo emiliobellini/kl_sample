@@ -9,6 +9,8 @@ the data will be stored in the repository.
 import numpy as np
 from astropy.io import fits
 import io
+import matplotlib
+import matplotlib.pyplot as plt
 
 def prep_fourier(args):
     """ Prepare data in fourier space.
@@ -21,29 +23,86 @@ def prep_fourier(args):
 
     """
 
+    arcsec_orig = 1 #Pixels dimension in arcsec
+    arcsec_new = 120 #Pixels dimension in arcsec
+    arcsec_ratio = int(np.round(float(arcsec_new)/float(arcsec_orig)))
+
 
     # Define absolute paths and check the existence of each required file
-    path = {
-        'mask_w4'    : io.path_exists_or_error(args.input_folder + 'W4.16bit.small.reg2.fits'),
-    }
+    path = {}
+    for count in range(4):
+        field = 'W'+str(count+1)
+        path['mask_'+field] = io.path_exists_or_error(args.input_folder +field+'.16bit.small.reg2.fits.gz')
+    path['output'] = io.path_exists_or_error(args.input_folder)
 
 
-    # Read
-    w4data = io.read_from_fits(path['mask_w4'], 'primary')
-    w4hd = io.read_header_from_fits(path['mask_w4'], 'primary')
-    io.print_info_fits('/home/emilio/Codes/kl_sample/data/data_real.fits')
+    for count in range(4):
 
-    pz =  io.read_from_fits('/home/emilio/Codes/kl_sample/data/data_real.fits', 'photo_z')
-    print [(pz[0]*pz[x]).sum() for x in range(1,8)]
+        field = 'W'+str(count+1)
+        # Read
+        data = io.read_from_fits(path['mask_'+field], 'primary').astype(int)
 
-    # print w4data.shape
-    # for key in w4hd.keys():
-    #     print key, w4hd[key]
-    tot = 0
-    totx, toty = w4data.shape
-    # for nx in range(totx):
-    #     for ny in range(toty):
-    #         if w4data[nx,ny]<1:
-    #             tot+=1
-    # print tot
-    # print tot/(60.**4.)
+        # Convert to boolean
+        data_bool = (1-np.array(data, dtype=bool)).astype(int)
+
+        # Decrease pixels
+        div1, mod1 = np.divmod(data_bool.shape[0], arcsec_ratio)
+        div2, mod2 = np.divmod(data_bool.shape[1], arcsec_ratio)
+        if mod1 == 0:
+            x1 = div1
+        else:
+            x1 = div1+1
+        if mod2 == 0:
+            x2 = div2
+        else:
+            x2 = div2+1
+
+        start1 = int(np.round((x1*arcsec_ratio-data_bool.shape[0])/2.))
+        start2 = int(np.round((x2*arcsec_ratio-data_bool.shape[1])/2.))
+        end1 = start1+data_bool.shape[0]
+        end2 = start2+data_bool.shape[1]
+
+        data_bool_ext = np.zeros((x1*arcsec_ratio, x2*arcsec_ratio)).astype(int)
+        data_bool_ext[start1:end1,start2:end2] = data_bool
+
+
+        data_new = np.zeros((x1, x2))
+
+        for count1 in range(x1):
+            for count2 in range(x1):
+                start1 = count1*arcsec_ratio
+                start2 = count2*arcsec_ratio
+                new_pixel = data_bool_ext[start1:start1+arcsec_ratio,start2:start2+arcsec_ratio]
+                data_new[count1,count2] = np.average(new_pixel)
+
+        print 'Field ' + field + ':'
+        print '----> Original shape: ', data_bool.shape
+        print '----> Extended shape: ', data_bool_ext.shape
+        print '----> New shape: ', (x1, x2)
+        add1 = float(x1)*arcsec_ratio/data_bool.shape[0]-1.
+        add2 = float(x2)*arcsec_ratio/data_bool.shape[1]-1.
+        print '----> Pixels added: '+'({0:5.2%}, '.format(add1)+'{0:5.2%})'.format(add2)
+
+
+
+        plt.imshow(data)
+        plt.colorbar()
+        plt.savefig(path['output']+'/'+field+'_full.pdf')
+        plt.close()
+
+        plt.imshow(data_bool)
+        plt.colorbar()
+        plt.savefig(path['output']+'/'+field+'_bool.pdf')
+        plt.close()
+
+        plt.imshow(data_bool_ext)
+        plt.colorbar()
+        plt.savefig(path['output']+'/'+field+'_bool_ext.pdf')
+        plt.close()
+
+        plt.imshow(data_new)
+        plt.colorbar()
+        plt.savefig(path['output']+'/'+field+'_new.pdf')
+        plt.close()
+
+    print 'Success!!'

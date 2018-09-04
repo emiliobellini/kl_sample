@@ -255,7 +255,7 @@ def read_header_from_fits(fname, name):
         return fn[name].header
 
 
-def write_to_fits(fname, array, name):
+def write_to_fits(fname, array, name, header=None):
     """ Write an array to a fits file.
 
     Args:
@@ -278,7 +278,7 @@ def write_to_fits(fname, array, name):
             hdul.__delitem__(name)
         except:
             pass
-        hdul.append(fits.ImageHDU(array, name=name))
+        hdul.append(fits.ImageHDU(array, name=name, header=header))
     print('Appended ' + name.upper() + ' to ' + os.path.relpath(fname))
     sys.stdout.flush()
     return

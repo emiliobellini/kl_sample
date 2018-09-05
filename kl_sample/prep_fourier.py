@@ -197,7 +197,7 @@ def prep_fourier(args):
 
                 # Print every some step
                 if (count+1) % 1000 == 0:
-                    print '----> Done {0:5.1%} of the pixels ({})'.format(float(count+1) /len(pix_gals), len(pix_gals))
+                    print '----> Done {0:5.2%} of the pixels ({1:d})'.format(float(count+1)/len(pix_gals), len(pix_gals))
                     sys.stdout.flush()
 
             print '----> Shear calculation finished!'

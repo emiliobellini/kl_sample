@@ -163,7 +163,7 @@ def prep_fourier(args):
             sys.stdout.flush()
 
             # Scan over the populated pixels and calculate the shear
-            for pix in pix_gals:
+            for count, pix in enumerate(pix_gals):
                 # Calculate averaged multiplicative correction
                 if pix[0]-n_avg_m<0:
                     s1 = 0
@@ -194,6 +194,11 @@ def prep_fourier(args):
                 # Calculate shear
                 map_1[tuple(pix)] = np.average(e1, weights=weight)/(1+m)
                 map_2[tuple(pix)] = np.average(e2-c2, weights=weight)/(1+m)
+
+                # Print every some step
+                if (count+1) % 1000 == 0:
+                    print '----> Done {0:5.1%} of the pixels ({})'.format(float(count+1) /len(pix_gals), len(pix_gals))
+                    sys.stdout.flush()
 
             print '----> Shear calculation finished!'
             sys.stdout.flush()

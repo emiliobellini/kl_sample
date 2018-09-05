@@ -67,7 +67,7 @@ def prep_fourier(args):
 
 
     # Main loop to scan over the fields
-    for f in ['W3']:
+    for f in fields:
 
         # Calculating the mask
         print 'Calculating mask for field ' + f + ':'

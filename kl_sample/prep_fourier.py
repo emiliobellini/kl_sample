@@ -62,7 +62,7 @@ def prep_fourier(args):
     # Function that filters the galaxies
     def filter_gals(gals, field, z_bin):
         sel = set.get_mask(gals, z_bin[0], z_bin[1])
-        sel = np.array([x[:2] in f for x in gals['id']])*sel
+        sel = np.array([x[:2] in field for x in gals['id']])*sel
         return sel
 
 
@@ -155,6 +155,7 @@ def prep_fourier(args):
             pos_w = np.array([[gals_f['ALPHA_J2000'][x],gals_f['DELTA_J2000'][x]] for x in range(len(gals_f))])
             # Pixel position
             pos_pix = w.wcs_world2pix(pos_w, 1).astype(int)
+            pos_pix = np.flip(pos_pix,axis=1) #Need to invert the columns
             # Pixels where at least one galaxy has been found
             pix_gals = np.unique(pos_pix, axis=0)
 

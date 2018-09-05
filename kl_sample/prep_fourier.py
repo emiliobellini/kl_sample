@@ -159,7 +159,7 @@ def prep_fourier(args):
             # Pixels where at least one galaxy has been found
             pix_gals = np.unique(pos_pix, axis=0)
 
-            print '----> Empty pixels: {0:5.2%}, '.format(1.-np.array([mask[tuple(x)] for x in pix_gals]).sum()/mask.flatten().sum())
+            print '----> Empty pixels: {0:5.2%}'.format(1.-np.array([mask[tuple(x)] for x in pix_gals]).sum()/mask.flatten().sum())
             sys.stdout.flush()
 
             # Scan over the populated pixels and calculate the shear

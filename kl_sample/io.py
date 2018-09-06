@@ -67,7 +67,15 @@ def argument_parser():
     #Arguments for 'prep_real'
     prep_real_parser.add_argument('input_folder', type=str, help='Input folder')
     #Arguments for 'prep_fourier'
-    prep_fourier_parser.add_argument('input_folder', type=str, help='Input folder')
+    prep_fourier_parser.add_argument('input_path', type=str, help='Input path (path/fname_)')
+    prep_fourier_parser.add_argument('--run_mask', '-mk', help='Run mask routine '
+        'even if the files are already present', action='store_true')
+    prep_fourier_parser.add_argument('--run_cat', '-c', help='Run catalogue routine '
+        'even if the files are already present', action='store_true')
+    prep_fourier_parser.add_argument('--run_map', '-mp', help='Run map routine '
+        'even if the files are already present', action='store_true')
+    prep_fourier_parser.add_argument('--run_mult', '-m', help='Run multiplicative correction '
+        'routine even if the files are already present', action='store_true')
     #Arguments for 'get_kl'
     get_kl_parser.add_argument('params_file', type=str, help='Parameters file')
 

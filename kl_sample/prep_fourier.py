@@ -30,9 +30,15 @@ def prep_fourier(args):
 
 # ------------------- Useful parameters ---------------------------------------#
 
+    # Global variable collecting warnings
     warning = False
+    # List of CFHTlens fields
     fields = ['W'+str(x+1) for x in range(4)]
+    # List of redshift bins
     z_bins = np.array([[set.Z_BINS[n], set.Z_BINS[n+1]] for n in np.arange(len(set.Z_BINS)-1)])
+    # Size in arcsec of the degraded masks and of the maps
+    size_pix = 120.
+
 
 
 
@@ -115,52 +121,47 @@ def prep_fourier(args):
 
 # ------------------- Function to calculate the mask --------------------------#
 
-    def run_mask(path=path, fields=['W2'], z_bins=z_bins):
+    def run_mask(path=path, fields=fields, z_bins=z_bins, size_pix=size_pix):
 
         print 'Running mask module'
         sys.stdout.flush()
+        warning = False
 
-        # Scan over the fields
-        for f in fields:
-            print 'Calculating mask for field ' + f + ':'
-            sys.stdout.flush()
 
-            # Remove old output file to avoid confusion
+        # Function that read necessary data and check their internal structure
+        def read_mask(fname, imname='PRIMARY',
+                keys=['CRPIX1','CRPIX2','CD1_1','CD2_2','CRVAL1','CRVAL2','CTYPE1','CTYPE2']):
+
+            # Read the image
             try:
-                os.remove(path['mask_'+f])
-            except:
-                pass
-
-            # Read necessary data and check their internal structure
-            finput = path['mask_sec_'+f]
-            imname = 'PRIMARY'
-            try:
-                mask_sec = io.read_from_fits(finput, imname).astype(int)
+                mask = io.read_from_fits(fname, imname).astype(int)
             except KeyError:
-                print 'WARNING: No image PRIMARY in arcsec mask for field '+f+'. Skipping calculation!'
-                continue
+                print 'WARNING: No image '+imname+' in '+fname+'. Skipping calculation!'
+                return None, None, True
+            # Read the header
             try:
-                hd_sec = io.read_header_from_fits(finput, imname)
-                print hd_sec['CRPIX1']
-    #     w.wcs.crpix = np.array([start1+hd['CRPIX1'], start2+hd['CRPIX2']])/dim_ratio
-    #     w.wcs.cdelt = np.array([hd['CD1_1'], hd['CD2_2']])*dim_ratio
-    #     w.wcs.crval = np.array([hd['CRVAL1'], hd['CRVAL2']])
-    #     w.wcs.ctype = [hd['CTYPE1'], hd['CTYPE2']]
+                hd = io.read_header_from_fits(fname, imname)
+                hd = dict([(x,hd[x]) for x in keys])
             except KeyError:
-                print 'WARNING: Header not well defined for field '+f+', missing parameters. Skipping calculation!'
-                continue
+                print 'WARNING: Header ill defined in '+fname+', missing parameters. Skipping calculation!'
+                return None, None, True
 
-            print '----> Original shape: ', mask_sec.shape
-            sys.stdout.flush()
-
-        return
+            return mask, hd, warning
 
 
+        # Function to degrade boolean masks
+        def degrade_mask(mask, hd, size_pix=size_pix):
 
-    #     # Convert the mask to boolean
-    #     mask_orig = (1-np.array(mask_orig, dtype=bool)).astype(bool)
-    #
-    #     # Calculate new dimensions
+            # Calculate new dimensions
+            ratio_pix1 = abs(size_pix/hd['CD1_1']/60.**2)
+            ratio_pix2 = abs(size_pix/hd['CD2_2']/60.**2)
+
+            # print mask.shape
+            # print size_pix
+            # print hd
+
+
+
     #     div1, mod1 = np.divmod(mask_orig.shape[0], dim_ratio)
     #     div2, mod2 = np.divmod(mask_orig.shape[1], dim_ratio)
     #     if mod1 == 0:
@@ -190,8 +191,7 @@ def prep_fourier(args):
     #             s2 = count2*dim_ratio
     #             new_pix = mask_orig_ext[s1:s1+dim_ratio,s2:s2+dim_ratio].astype(float)
     #             mask[count1,count2] = np.average(new_pix)
-    #     print '----> New shape: ', (x1, x2)
-    #     sys.stdout.flush()
+
     #     add1 = float(x1)*dim_ratio/mask_orig.shape[0]-1.
     #     add2 = float(x2)*dim_ratio/mask_orig.shape[1]-1.
     #     print '----> Pixels added: '+'({0:5.2%}, '.format(add1)+'{0:5.2%})'.format(add2)
@@ -207,6 +207,54 @@ def prep_fourier(args):
     #     w.wcs.crval = np.array([hd['CRVAL1'], hd['CRVAL2']])
     #     w.wcs.ctype = [hd['CTYPE1'], hd['CTYPE2']]
     #     hd = w.to_header()
+
+            return mask, hd
+
+
+        # Main loop: scan over the fields and generate new maps
+        for f in fields:
+            print 'Calculating mask for field ' + f + ':'
+            sys.stdout.flush()
+
+            # Remove old output file to avoid confusion
+            try:
+                os.remove(path['mask_'+f])
+            except:
+                pass
+
+            # Read masks
+            mask_sec, hd_sec, warning = read_mask(path['mask_sec_'+f])
+            mask_gb, hd_gb, warning = read_mask(path['good_bad_'+f])
+            if abs(hd_sec['CRVAL1']/hd_gb['CRVAL1']-1.)>1.e-5 or abs(hd_sec['CRVAL2']/hd_gb['CRVAL2']-1.)>1.e-5:
+                print 'WARNING: Central position of the two masks is different. Skipping calculation!'
+                warning = True
+            if warning:
+                continue
+
+            # Convert masks to boolean
+            mask_sec = (1-np.array(mask_sec, dtype=bool)).astype(bool)
+            print '----> Shape arcsec mask: ', mask_sec.shape
+            sys.stdout.flush()
+            mask_gb = np.array(mask_gb, dtype=bool)
+            print '----> Shape good_bad mask: ', mask_gb.shape
+            sys.stdout.flush()
+
+            # Degrade masks
+            mask_min, hd_min = degrade_mask(mask_sec, hd_sec)
+            print '----> Shape arcmin mask: ', mask_min.shape
+            sys.stdout.flush()
+            mask_gb, hd_gb = degrade_mask(mask_gb, hd_gb)
+            print '----> New shape good_bad mask: ', mask_min.shape
+            sys.stdout.flush()
+
+
+
+
+
+        return warning
+
+
+
     #     # Write to file
     #     fname = path['input']+'/'+f+'_mask.fits'
     #     io.write_to_fits(fname, mask, f+'_mask', header=hd)
@@ -216,34 +264,37 @@ def prep_fourier(args):
 # ------------------- Function to calculate the clean catalogue ---------------#
 
     def run_cat(path=path, fields=fields, z_bins=z_bins):
-        return
+        warning = False
+        return warning
 
 
 
 # ------------------- Function to calculate the multiplicative correction -----#
 
     def run_mult(path=path, fields=fields, z_bins=z_bins):
-        return
+        warning = False
+        return warning
 
 
 
 # ------------------- Function to calculate the map ---------------------------#
 
     def run_map(path=path, fields=fields, z_bins=z_bins):
-        return
+        warning = False
+        return warning
 
 
 
 # ------------------- Pipeline ------------------------------------------------#
 
     if is_run_mask:
-        run_mask()
+        warning = run_mask(fields=['W2']) or warning
     if is_run_cat:
-        run_cat()
+        warning = run_cat() or warning
     if is_run_mult:
-        run_mult()
+        warning = run_mult() or warning
     if is_run_map:
-        run_map()
+        warning = run_map() or warning
 
     if warning:
         print 'Done! However something went unexpectedly!! Check your warnings!'

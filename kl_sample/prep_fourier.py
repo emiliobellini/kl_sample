@@ -9,7 +9,7 @@ the data will be stored in the repository.
 import os
 import sys
 import numpy as np
-# from astropy.io import fits
+from astropy.io import fits
 # from astropy import wcs
 import settings as set
 import io
@@ -48,11 +48,12 @@ def prep_fourier(args):
         path['m_'+f] = path['base']+'/'+path['fname']+'mult_corr_'+f+'.fits'
         path['map_'+f] = path['base']+'/'+path['fname']+'map_'+f+'.fits'
         path['mask_sec_'+f] = path['base']+'/mask_arcsec_'+f+'.fits.gz'
-        path['mask_min_'+f] = path['base']+'/mask_'+f+'.fits'
+        path['mask_'+f] = path['base']+'/mask_'+f+'.fits'
+        path['good_bad_'+f] = path['base']+'/good_bad_'+f+'.fits'
 
     # Determine which modules have to be run, by checking the existence of the
     # output files and arguments passed by the user
-    is_run_mask = np.array([not(os.path.exists(path['mask_min_'+f])) for f in fields]).any()
+    is_run_mask = np.array([not(os.path.exists(path['mask_'+f])) for f in fields]).any()
     if args.run_mask:
         is_run_mask = True
     is_run_cat = np.array([not(os.path.exists(path['cat_'+f])) for f in fields]).any()
@@ -67,48 +68,148 @@ def prep_fourier(args):
 
     # Check the existence of the required input files
     if is_run_mask:
-        if np.array([not(os.path.exists(path['mask_sec_'+f])) for f in fields]).any():
-            print 'WARNING: Skipping module to calculate the masks. Input files not found!'
+        nofile1 = np.array([not(os.path.exists(path['mask_sec_'+f])) for f in fields]).any()
+        nofile2 = np.array([not(os.path.exists(path['good_bad_'+f])) for f in fields]).any()
+        if nofile1 or nofile2:
+            print 'WARNING: I will skip module to calculate the masks. Input files not found!'
             sys.stdout.flush()
             is_run_mask = False
             warning = True
     else:
-        print 'Skipping module to calculate the masks. Output files already there!'
+        print 'I will skip module to calculate the masks. Output files already there!'
         sys.stdout.flush()
     if is_run_cat:
-        if not(os.path.exists(path['cat_full'])):
-            print 'WARNING: Skipping module to calculate the clean catalogues. Input file not found!'
+        nofile1 = not(os.path.exists(path['cat_full']))
+        if nofile1:
+            print 'WARNING: I will skip module to calculate the clean catalogues. Input file not found!'
             sys.stdout.flush()
             is_run_cat = False
             warning = True
     else:
-        print 'Skipping module to calculate the clean catalogues. Output files already there!'
+        print 'I will skip module to calculate the clean catalogues. Output files already there!'
         sys.stdout.flush()
     if is_run_mult:
-        if not(is_run_cat) and np.array([not(os.path.exists(path['cat_'+f])) for f in fields]).any():
-            print 'WARNING: Skipping module to calculate the multiplicative correction. Input files not found!'
+        nofile1 = np.array([not(os.path.exists(path['cat_'+f])) for f in fields]).any()
+        nofile2 = np.array([not(os.path.exists(path['mask_'+f])) for f in fields]).any()
+        if (not(is_run_cat) and nofile1) or (not(is_run_mask) and nofile2):
+            print 'WARNING: I will skip module to calculate the multiplicative correction. Input files not found!'
             sys.stdout.flush()
             is_run_mult = False
             warning = True
     else:
-        print 'Skipping module to calculate the multiplicative correction. Output files already there!'
+        print 'I will skip module to calculate the multiplicative correction. Output files already there!'
         sys.stdout.flush()
     if is_run_map:
-        if not(is_run_cat) and np.array([not(os.path.exists(path['cat_'+f])) for f in fields]).any():
-            print 'WARNING: Skipping module to calculate the map. Input files not found!'
+        nofile1 = np.array([not(os.path.exists(path['cat_'+f])) for f in fields]).any()
+        nofile2 = np.array([not(os.path.exists(path['mask_'+f])) for f in fields]).any()
+        if (not(is_run_cat) and nofile1) or (not(is_run_mask) and nofile2):
+            print 'WARNING: I will skip module to calculate the map. Input files not found!'
             sys.stdout.flush()
             is_run_map = False
             warning = True
     else:
-        print 'Skipping module to calculate the map. Output files already there!'
+        print 'I will skip module to calculate the map. Output files already there!'
         sys.stdout.flush()
 
 
 
 # ------------------- Function to calculate the mask --------------------------#
 
-    def run_mask(path=path, fields=fields, z_bins=z_bins):
+    def run_mask(path=path, fields=['W2'], z_bins=z_bins):
+
+        print 'Running mask module'
+        sys.stdout.flush()
+
+        # Scan over the fields
+        for f in fields:
+            print 'Calculating mask for field ' + f + ':'
+            sys.stdout.flush()
+
+            # Remove old output file to avoid confusion
+            try:
+                os.remove(path['mask_'+f])
+            except:
+                pass
+
+            # Read necessary data and check their internal structure
+            finput = path['mask_sec_'+f]
+            imname = 'PRIMARY'
+            try:
+                mask_sec = io.read_from_fits(finput, imname).astype(int)
+            except KeyError:
+                print 'WARNING: No image PRIMARY in arcsec mask for field '+f+'. Skipping calculation!'
+                continue
+            try:
+                hd_sec = io.read_header_from_fits(finput, imname)
+                print hd_sec['CRPIX1']
+    #     w.wcs.crpix = np.array([start1+hd['CRPIX1'], start2+hd['CRPIX2']])/dim_ratio
+    #     w.wcs.cdelt = np.array([hd['CD1_1'], hd['CD2_2']])*dim_ratio
+    #     w.wcs.crval = np.array([hd['CRVAL1'], hd['CRVAL2']])
+    #     w.wcs.ctype = [hd['CTYPE1'], hd['CTYPE2']]
+            except KeyError:
+                print 'WARNING: Header not well defined for field '+f+', missing parameters. Skipping calculation!'
+                continue
+
+            print '----> Original shape: ', mask_sec.shape
+            sys.stdout.flush()
+
         return
+
+
+
+    #     # Convert the mask to boolean
+    #     mask_orig = (1-np.array(mask_orig, dtype=bool)).astype(bool)
+    #
+    #     # Calculate new dimensions
+    #     div1, mod1 = np.divmod(mask_orig.shape[0], dim_ratio)
+    #     div2, mod2 = np.divmod(mask_orig.shape[1], dim_ratio)
+    #     if mod1 == 0:
+    #         x1 = div1
+    #     else:
+    #         x1 = div1+1
+    #     if mod2 == 0:
+    #         x2 = div2
+    #     else:
+    #         x2 = div2+1
+    #     start1 = int(np.round((x1*dim_ratio-mask_orig.shape[0])/2.))
+    #     start2 = int(np.round((x2*dim_ratio-mask_orig.shape[1])/2.))
+    #     end1 = start1+mask_orig.shape[0]
+    #     end2 = start2+mask_orig.shape[1]
+    #
+    #     # Add borders to the mask
+    #     mask_orig_ext = np.zeros((x1*dim_ratio, x2*dim_ratio), dtype=bool)
+    #     mask_orig_ext[start1:end1,start2:end2] = mask_orig
+    #     print '----> Extended shape: ', mask_orig_ext.shape
+    #     sys.stdout.flush()
+    #
+    #     # Calculate new mask
+    #     mask = np.zeros((x1, x2))
+    #     for count1 in range(x1):
+    #         for count2 in range(x2):
+    #             s1 = count1*dim_ratio
+    #             s2 = count2*dim_ratio
+    #             new_pix = mask_orig_ext[s1:s1+dim_ratio,s2:s2+dim_ratio].astype(float)
+    #             mask[count1,count2] = np.average(new_pix)
+    #     print '----> New shape: ', (x1, x2)
+    #     sys.stdout.flush()
+    #     add1 = float(x1)*dim_ratio/mask_orig.shape[0]-1.
+    #     add2 = float(x2)*dim_ratio/mask_orig.shape[1]-1.
+    #     print '----> Pixels added: '+'({0:5.2%}, '.format(add1)+'{0:5.2%})'.format(add2)
+    #     sys.stdout.flush()
+    #
+    #     # Create a WCS object and save it to file
+    #     hd = io.read_header_from_fits(path['mask_'+f], 'primary')
+    #     # Create a new WCS object
+    #     w = wcs.WCS(naxis=2)
+    #     # Write header
+    #     w.wcs.crpix = np.array([start1+hd['CRPIX1'], start2+hd['CRPIX2']])/dim_ratio
+    #     w.wcs.cdelt = np.array([hd['CD1_1'], hd['CD2_2']])*dim_ratio
+    #     w.wcs.crval = np.array([hd['CRVAL1'], hd['CRVAL2']])
+    #     w.wcs.ctype = [hd['CTYPE1'], hd['CTYPE2']]
+    #     hd = w.to_header()
+    #     # Write to file
+    #     fname = path['input']+'/'+f+'_mask.fits'
+    #     io.write_to_fits(fname, mask, f+'_mask', header=hd)
 
 
 
@@ -168,24 +269,8 @@ def prep_fourier(args):
     # dim_ratio = int(np.round(float(dim_new)/float(dim_orig)))
     #
     #
-    # # Define absolute paths and check the existence of each required file
-    # path = {}
-    # path['input'] = io.path_exists_or_error(args.input_folder)
-    # for f in fields:
-    #     path['mask_'+f] = io.path_exists_or_error(path['input']+'/'+f+'.16bit.small.reg2.fits.gz')
-    # path['output'] = io.path_exists_or_error(args.input_folder)
-    #
     # # Read galaxy catalogue
     # gals = io.read_from_fits(path['input']+'/data.fits', 'data')
-    #
-    #
-    # # Plotting function
-    # # def plot_and_save(table, fname):
-    # #     plt.imshow(table,interpolation='nearest')
-    # #     plt.colorbar()
-    # #     plt.savefig(fname)
-    # #     plt.close()
-    # #     return
     #
     #
     # # Function that filters the galaxies
@@ -198,71 +283,6 @@ def prep_fourier(args):
     # # Main loop to scan over the fields
     # for f in fields:
     #
-    #     # Calculating the mask
-    #     print 'Calculating mask for field ' + f + ':'
-    #     sys.stdout.flush()
-    #
-    #
-    #     # Read original mask
-    #     mask_orig = io.read_from_fits(path['mask_'+f], 'primary').astype(int)
-    #     print '----> Original shape: ', mask_orig.shape
-    #     sys.stdout.flush()
-    #
-    #     # Convert the mask to boolean
-    #     mask_orig = (1-np.array(mask_orig, dtype=bool)).astype(bool)
-    #
-    #     # Calculate new dimensions
-    #     div1, mod1 = np.divmod(mask_orig.shape[0], dim_ratio)
-    #     div2, mod2 = np.divmod(mask_orig.shape[1], dim_ratio)
-    #     if mod1 == 0:
-    #         x1 = div1
-    #     else:
-    #         x1 = div1+1
-    #     if mod2 == 0:
-    #         x2 = div2
-    #     else:
-    #         x2 = div2+1
-    #     start1 = int(np.round((x1*dim_ratio-mask_orig.shape[0])/2.))
-    #     start2 = int(np.round((x2*dim_ratio-mask_orig.shape[1])/2.))
-    #     end1 = start1+mask_orig.shape[0]
-    #     end2 = start2+mask_orig.shape[1]
-    #
-    #     # Add borders to the mask
-    #     mask_orig_ext = np.zeros((x1*dim_ratio, x2*dim_ratio), dtype=bool)
-    #     mask_orig_ext[start1:end1,start2:end2] = mask_orig
-    #     # plot_and_save(mask_orig_ext, path['output']+'/'+f+'_orig.pdf')
-    #     print '----> Extended shape: ', mask_orig_ext.shape
-    #     sys.stdout.flush()
-    #
-    #     # Calculate new mask
-    #     mask = np.zeros((x1, x2))
-    #     for count1 in range(x1):
-    #         for count2 in range(x2):
-    #             s1 = count1*dim_ratio
-    #             s2 = count2*dim_ratio
-    #             new_pix = mask_orig_ext[s1:s1+dim_ratio,s2:s2+dim_ratio].astype(float)
-    #             mask[count1,count2] = np.average(new_pix)
-    #     # plot_and_save(mask, path['output']+'/'+f+'_new.pdf')
-    #     print '----> New shape: ', (x1, x2)
-    #     sys.stdout.flush()
-    #     add1 = float(x1)*dim_ratio/mask_orig.shape[0]-1.
-    #     add2 = float(x2)*dim_ratio/mask_orig.shape[1]-1.
-    #     print '----> Pixels added: '+'({0:5.2%}, '.format(add1)+'{0:5.2%})'.format(add2)
-    #     sys.stdout.flush()
-    #
-    #     # Create a WCS object and save it to file
-    #     hd = io.read_header_from_fits(path['mask_'+f], 'primary')
-    #     # Create a new WCS object
-    #     w = wcs.WCS(naxis=2)
-    #     # Write header
-    #     w.wcs.crpix = np.array([start1+hd['CRPIX1'], start2+hd['CRPIX2']])/dim_ratio
-    #     w.wcs.cdelt = np.array([hd['CD1_1'], hd['CD2_2']])*dim_ratio
-    #     w.wcs.crval = np.array([hd['CRVAL1'], hd['CRVAL2']])
-    #     w.wcs.ctype = [hd['CTYPE1'], hd['CTYPE2']]
-    #     hd = w.to_header()
-    #     # Write to file
-    #     fname = path['input']+'/'+f+'_mask.fits'
-    #     io.write_to_fits(fname, mask, f+'_mask', header=hd)
     #
     #
     #
@@ -326,7 +346,7 @@ def prep_fourier(args):
     #
     #             # Print every some step
     #             if (count+1) % 1000 == 0:
-    #                 print '----> Done {0:5.1%} of the pixels ({})'.format(float(count+1) /len(pix_gals), len(pix_gals))
+    #                 print '----> Done {0:5.1%} of the pixels ({1:d})'.format(float(count+1) /len(pix_gals), len(pix_gals))
     #                 sys.stdout.flush()
     #
     #         print '----> Shear calculation finished!'

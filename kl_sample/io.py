@@ -291,7 +291,7 @@ def write_to_fits(fname, array, name, type='image', header=None):
         if type=='image':
             hdul.append(fits.ImageHDU(array, name=name, header=header))
         elif type=='table':
-            hdul.append(fits.BinTableHDU(array, name=name, header=header))
+            hdul.append(array)
         else:
             print('Type '+type+' not recognized! Data not saved to file!')
             return True

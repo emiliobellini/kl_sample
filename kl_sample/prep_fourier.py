@@ -321,11 +321,21 @@ def prep_fourier(args):
                 gals = data['data'][filter]
                 pz = data['pz_full'][filter]
 
-                # Save file
+                # Create Table and save it
+                table_keys = ['ALPHA_J2000', 'DELTA_J2000', 'e1', 'e2', 'c1', 'c2', 'weight']
+                columns = []
+                for key in table_keys:
+                    if key=='c1':
+                        columns.append(fits.Column(name=key,array=np.zeros(len(gals)),format='E'))
+                    else:
+                        columns.append(fits.Column(name=key,array=gals[key],format='E'))
+                name = 'CAT_{}_Z{}'.format(f, n_z_bin+1)
+                gals = fits.BinTableHDU.from_columns(columns, name=name)
+                warning = io.write_to_fits(path['cat_'+f], gals, name, type='table')
+
+                # Save image
                 name = 'PZ_{}_Z{}'.format(f, n_z_bin+1)
                 warning = io.write_to_fits(path['cat_'+f], pz, name, type='image')
-                name = 'CAT_{}_Z{}'.format(f, n_z_bin+1)
-                warning = io.write_to_fits(path['cat_'+f], gals, name, type='table')
 
             io.print_info_fits(path['cat_'+f])
 
@@ -354,7 +364,7 @@ def prep_fourier(args):
     if is_run_mask:
         warning = run_mask() or warning
     if is_run_cat:
-        warning = run_cat() or warning
+        warning = run_cat(fields=['W3']) or warning
     if is_run_mult:
         warning = run_mult() or warning
     if is_run_map:

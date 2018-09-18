@@ -263,7 +263,7 @@ def read_header_from_fits(fname, name):
         return fn[name].header
 
 
-def write_to_fits(fname, array, name, header=None):
+def write_to_fits(fname, array, name, type='image', header=None):
     """ Write an array to a fits file.
 
     Args:
@@ -276,6 +276,8 @@ def write_to_fits(fname, array, name, header=None):
 
     """
 
+    warning = False
+
     # If file does not exist, create it
     if not os.path.exists(fname):
         hdul = fits.HDUList([fits.PrimaryHDU()])
@@ -286,10 +288,16 @@ def write_to_fits(fname, array, name, header=None):
             hdul.__delitem__(name)
         except:
             pass
-        hdul.append(fits.ImageHDU(array, name=name, header=header))
+        if type=='image':
+            hdul.append(fits.ImageHDU(array, name=name, header=header))
+        elif type=='table':
+            hdul.append(fits.BinTableHDU(array, name=name, header=header))
+        else:
+            print('Type '+type+' not recognized! Data not saved to file!')
+            return True
     print('Appended ' + name.upper() + ' to ' + os.path.relpath(fname))
     sys.stdout.flush()
-    return
+    return warning
 
 
 def print_info_fits(fname):

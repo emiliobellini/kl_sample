@@ -8,6 +8,7 @@ the data will be stored in the repository.
 
 import os
 import sys
+import re
 import numpy as np
 from astropy.io import fits
 # from astropy import wcs
@@ -49,13 +50,12 @@ def prep_fourier(args):
     path['base'], path['fname'] = os.path.split(os.path.abspath(args.input_path))
     io.path_exists_or_error(path['base'])
     path['cat_full'] = path['base']+'/'+path['fname']+'full_cat.fits'
+    path['mask_url'] = path['base']+'/mask_url.txt'
     for f in fields:
         path['cat_'+f] = path['base']+'/'+path['fname']+'cat_'+f+'.fits'
         path['m_'+f] = path['base']+'/'+path['fname']+'mult_corr_'+f+'.fits'
         path['map_'+f] = path['base']+'/'+path['fname']+'map_'+f+'.fits'
-        path['mask_sec_'+f] = path['base']+'/mask_arcsec_'+f+'.fits.gz'
         path['mask_'+f] = path['base']+'/mask_'+f+'.fits'
-        path['good_bad_'+f] = path['base']+'/good_bad_'+f+'.fits'
 
     # Determine which modules have to be run, by checking the existence of the
     # output files and arguments passed by the user
@@ -74,9 +74,8 @@ def prep_fourier(args):
 
     # Check the existence of the required input files
     if is_run_mask:
-        nofile1 = np.array([not(os.path.exists(path['mask_sec_'+f])) for f in fields]).any()
-        nofile2 = np.array([not(os.path.exists(path['good_bad_'+f])) for f in fields]).any()
-        if nofile1 or nofile2:
+        nofile1 = not(os.path.exists(path['mask_url']))
+        if nofile1:
             print 'WARNING: I will skip module to calculate the masks. Input files not found!'
             sys.stdout.flush()
             is_run_mask = False
@@ -128,89 +127,6 @@ def prep_fourier(args):
         warning = False
 
 
-        # Function that read necessary data and check their internal structure
-        def read_mask(fname, imname='PRIMARY',
-                keys=['CRPIX1','CRPIX2','CD1_1','CD2_2','CRVAL1','CRVAL2','CTYPE1','CTYPE2']):
-
-            # Read the image
-            try:
-                mask = io.read_from_fits(fname, imname).astype(int)
-            except KeyError:
-                print 'WARNING: No image '+imname+' in '+fname+'. Skipping calculation!'
-                return None, None, True
-            # Read the header
-            try:
-                hd = io.read_header_from_fits(fname, imname)
-                hd = dict([(x,hd[x]) for x in keys])
-            except KeyError:
-                print 'WARNING: Header ill defined in '+fname+', missing parameters. Skipping calculation!'
-                return None, None, True
-
-            return mask, hd, warning
-
-
-        # Function to degrade boolean masks
-        def degrade_mask(mask, hd, size_pix=size_pix):
-
-            # Calculate new dimensions
-            ratio_pix1 = abs(size_pix/hd['CD1_1']/60.**2)
-            ratio_pix2 = abs(size_pix/hd['CD2_2']/60.**2)
-
-            # print mask.shape
-            # print size_pix
-            # print hd
-
-
-
-    #     div1, mod1 = np.divmod(mask_orig.shape[0], dim_ratio)
-    #     div2, mod2 = np.divmod(mask_orig.shape[1], dim_ratio)
-    #     if mod1 == 0:
-    #         x1 = div1
-    #     else:
-    #         x1 = div1+1
-    #     if mod2 == 0:
-    #         x2 = div2
-    #     else:
-    #         x2 = div2+1
-    #     start1 = int(np.round((x1*dim_ratio-mask_orig.shape[0])/2.))
-    #     start2 = int(np.round((x2*dim_ratio-mask_orig.shape[1])/2.))
-    #     end1 = start1+mask_orig.shape[0]
-    #     end2 = start2+mask_orig.shape[1]
-    #
-    #     # Add borders to the mask
-    #     mask_orig_ext = np.zeros((x1*dim_ratio, x2*dim_ratio), dtype=bool)
-    #     mask_orig_ext[start1:end1,start2:end2] = mask_orig
-    #     print '----> Extended shape: ', mask_orig_ext.shape
-    #     sys.stdout.flush()
-    #
-    #     # Calculate new mask
-    #     mask = np.zeros((x1, x2))
-    #     for count1 in range(x1):
-    #         for count2 in range(x2):
-    #             s1 = count1*dim_ratio
-    #             s2 = count2*dim_ratio
-    #             new_pix = mask_orig_ext[s1:s1+dim_ratio,s2:s2+dim_ratio].astype(float)
-    #             mask[count1,count2] = np.average(new_pix)
-
-    #     add1 = float(x1)*dim_ratio/mask_orig.shape[0]-1.
-    #     add2 = float(x2)*dim_ratio/mask_orig.shape[1]-1.
-    #     print '----> Pixels added: '+'({0:5.2%}, '.format(add1)+'{0:5.2%})'.format(add2)
-    #     sys.stdout.flush()
-    #
-    #     # Create a WCS object and save it to file
-    #     hd = io.read_header_from_fits(path['mask_'+f], 'primary')
-    #     # Create a new WCS object
-    #     w = wcs.WCS(naxis=2)
-    #     # Write header
-    #     w.wcs.crpix = np.array([start1+hd['CRPIX1'], start2+hd['CRPIX2']])/dim_ratio
-    #     w.wcs.cdelt = np.array([hd['CD1_1'], hd['CD2_2']])*dim_ratio
-    #     w.wcs.crval = np.array([hd['CRVAL1'], hd['CRVAL2']])
-    #     w.wcs.ctype = [hd['CTYPE1'], hd['CTYPE2']]
-    #     hd = w.to_header()
-
-            return mask, hd
-
-
         # Main loop: scan over the fields and generate new maps
         for f in fields:
             print 'Calculating mask for field ' + f + ':'
@@ -222,30 +138,133 @@ def prep_fourier(args):
             except:
                 pass
 
-            # Read masks
-            mask_sec, hd_sec, warning = read_mask(path['mask_sec_'+f])
-            mask_gb, hd_gb, warning = read_mask(path['good_bad_'+f])
-            if abs(hd_sec['CRVAL1']/hd_gb['CRVAL1']-1.)>1.e-5 or abs(hd_sec['CRVAL2']/hd_gb['CRVAL2']-1.)>1.e-5:
-                print 'WARNING: Central position of the two masks is different. Skipping calculation!'
-                warning = True
-            if warning:
-                continue
+            # Get urls for the sub-masks
+            urls = []
+            with open(path['mask_url'], 'r') as fn:
+                for line in fn:
+                    if re.match('.+'+f+'.+finalmask_mosaic.fits', line):
+                        urls.append(line.rstrip())
 
-            # Convert masks to boolean
-            mask_sec = (1-np.array(mask_sec, dtype=bool)).astype(bool)
-            print '----> Shape arcsec mask: ', mask_sec.shape
-            sys.stdout.flush()
-            mask_gb = np.array(mask_gb, dtype=bool)
-            print '----> Shape good_bad mask: ', mask_gb.shape
-            sys.stdout.flush()
 
-            # Degrade masks
-            mask_min, hd_min = degrade_mask(mask_sec, hd_sec)
-            print '----> Shape arcmin mask: ', mask_min.shape
-            sys.stdout.flush()
-            mask_gb, hd_gb = degrade_mask(mask_gb, hd_gb)
-            print '----> New shape good_bad mask: ', mask_min.shape
-            sys.stdout.flush()
+
+    #     # Function that read necessary data and check their internal structure
+    #     def read_mask(fname, imname='PRIMARY',
+    #             keys=['CRPIX1','CRPIX2','CD1_1','CD2_2','CRVAL1','CRVAL2','CTYPE1','CTYPE2']):
+    #
+    #         # Read the image
+    #         try:
+    #             mask = io.read_from_fits(fname, imname).astype(int)
+    #         except KeyError:
+    #             print 'WARNING: No image '+imname+' in '+fname+'. Skipping calculation!'
+    #             return None, None, True
+    #         # Read the header
+    #         try:
+    #             hd = io.read_header_from_fits(fname, imname)
+    #             hd = dict([(x,hd[x]) for x in keys])
+    #         except KeyError:
+    #             print 'WARNING: Header ill defined in '+fname+', missing parameters. Skipping calculation!'
+    #             return None, None, True
+    #
+    #         return mask, hd, warning
+    #
+    #
+    #     # Function to degrade boolean masks
+    #     def degrade_mask(mask, hd, size_pix=size_pix):
+    #
+    #         # Calculate new dimensions
+    #         ratio_pix1 = abs(size_pix/hd['CD1_1']/60.**2)
+    #         ratio_pix2 = abs(size_pix/hd['CD2_2']/60.**2)
+    #
+    #         # print mask.shape
+    #         # print size_pix
+    #         # print hd
+    #
+    #
+    #
+    # #     div1, mod1 = np.divmod(mask_orig.shape[0], dim_ratio)
+    # #     div2, mod2 = np.divmod(mask_orig.shape[1], dim_ratio)
+    # #     if mod1 == 0:
+    # #         x1 = div1
+    # #     else:
+    # #         x1 = div1+1
+    # #     if mod2 == 0:
+    # #         x2 = div2
+    # #     else:
+    # #         x2 = div2+1
+    # #     start1 = int(np.round((x1*dim_ratio-mask_orig.shape[0])/2.))
+    # #     start2 = int(np.round((x2*dim_ratio-mask_orig.shape[1])/2.))
+    # #     end1 = start1+mask_orig.shape[0]
+    # #     end2 = start2+mask_orig.shape[1]
+    # #
+    # #     # Add borders to the mask
+    # #     mask_orig_ext = np.zeros((x1*dim_ratio, x2*dim_ratio), dtype=bool)
+    # #     mask_orig_ext[start1:end1,start2:end2] = mask_orig
+    # #     print '----> Extended shape: ', mask_orig_ext.shape
+    # #     sys.stdout.flush()
+    # #
+    # #     # Calculate new mask
+    # #     mask = np.zeros((x1, x2))
+    # #     for count1 in range(x1):
+    # #         for count2 in range(x2):
+    # #             s1 = count1*dim_ratio
+    # #             s2 = count2*dim_ratio
+    # #             new_pix = mask_orig_ext[s1:s1+dim_ratio,s2:s2+dim_ratio].astype(float)
+    # #             mask[count1,count2] = np.average(new_pix)
+    #
+    # #     add1 = float(x1)*dim_ratio/mask_orig.shape[0]-1.
+    # #     add2 = float(x2)*dim_ratio/mask_orig.shape[1]-1.
+    # #     print '----> Pixels added: '+'({0:5.2%}, '.format(add1)+'{0:5.2%})'.format(add2)
+    # #     sys.stdout.flush()
+    # #
+    # #     # Create a WCS object and save it to file
+    # #     hd = io.read_header_from_fits(path['mask_'+f], 'primary')
+    # #     # Create a new WCS object
+    # #     w = wcs.WCS(naxis=2)
+    # #     # Write header
+    # #     w.wcs.crpix = np.array([start1+hd['CRPIX1'], start2+hd['CRPIX2']])/dim_ratio
+    # #     w.wcs.cdelt = np.array([hd['CD1_1'], hd['CD2_2']])*dim_ratio
+    # #     w.wcs.crval = np.array([hd['CRVAL1'], hd['CRVAL2']])
+    # #     w.wcs.ctype = [hd['CTYPE1'], hd['CTYPE2']]
+    # #     hd = w.to_header()
+    #
+    #         return mask, hd
+    #
+    #
+    #     # Main loop: scan over the fields and generate new maps
+    #     for f in fields:
+    #         print 'Calculating mask for field ' + f + ':'
+    #         sys.stdout.flush()
+    #
+    #         # Remove old output file to avoid confusion
+    #         try:
+    #             os.remove(path['mask_'+f])
+    #         except:
+    #             pass
+    #
+    #         # Read masks
+    #         mask_sec, hd_sec, warning = read_mask(path['mask_sec_'+f])
+    #         mask_gb, hd_gb, warning = read_mask(path['good_bad_'+f])
+    #         if abs(hd_sec['CRVAL1']/hd_gb['CRVAL1']-1.)>1.e-5 or abs(hd_sec['CRVAL2']/hd_gb['CRVAL2']-1.)>1.e-5:
+    #             print 'WARNING: Central position of the two masks is different. Skipping calculation!'
+    #             warning = True
+    #         if warning:
+    #             continue
+    #
+    #         # Convert masks to boolean
+    #         mask_sec = (1-np.array(mask_sec, dtype=bool)).astype(bool)
+    #         print '----> Shape arcsec mask: ', mask_sec.shape
+    #         sys.stdout.flush()
+    #         mask_gb = np.array(mask_gb, dtype=bool)
+    #         print '----> Shape good_bad mask: ', mask_gb.shape
+    #         sys.stdout.flush()
+    #
+    #         # Degrade masks
+    #         mask_min, hd_min = degrade_mask(mask_sec, hd_sec)
+    #         print '----> Shape arcmin mask: ', mask_min.shape
+    #         sys.stdout.flush()
+    #         mask_gb, hd_gb = degrade_mask(mask_gb, hd_gb)
+    #         print '----> New shape good_bad mask: ', mask_min.shape
+    #         sys.stdout.flush()
 
 
 
@@ -264,7 +283,52 @@ def prep_fourier(args):
 # ------------------- Function to calculate the clean catalogue ---------------#
 
     def run_cat(path=path, fields=fields, z_bins=z_bins):
+
+        print 'Running clean catalogue module'
+        sys.stdout.flush()
         warning = False
+
+
+        # Read galaxy catalogue (including photo_z)
+        data = {}
+        keys = ['data','pz_full']
+        fname = path['cat_full']
+        for key in keys:
+            try:
+                data[key] = io.read_from_fits(fname, key)
+            except KeyError:
+                print 'WARNING: No key '+key+' in '+fname+'. Skipping calculation!'
+                return True
+
+
+        # Function that filters the galaxies
+        def filter_gals(gals, field, z_bin):
+            sel = set.get_mask(gals, z_bin[0], z_bin[1])
+            sel = np.array([x[:2] in field for x in gals['id']])*sel
+            return sel
+
+        # Main loop: scan over the fields and generate new maps
+        for f in fields:
+
+            # Second loop to divide galaxies in redshift bins
+            for n_z_bin, z_bin in enumerate(z_bins):
+
+                print 'Calculating catalogue for field ' + f + ' and bin {}:'.format(n_z_bin+1)
+                sys.stdout.flush()
+
+                # Filter galaxies
+                filter = filter_gals(data['data'], f, z_bin)
+                gals = data['data'][filter]
+                pz = data['pz_full'][filter]
+
+                # Save file
+                name = 'PZ_{}_Z{}'.format(f, n_z_bin+1)
+                warning = io.write_to_fits(path['cat_'+f], pz, name, type='image')
+                name = 'CAT_{}_Z{}'.format(f, n_z_bin+1)
+                warning = io.write_to_fits(path['cat_'+f], gals, name, type='table')
+
+            io.print_info_fits(path['cat_'+f])
+
         return warning
 
 
@@ -288,7 +352,7 @@ def prep_fourier(args):
 # ------------------- Pipeline ------------------------------------------------#
 
     if is_run_mask:
-        warning = run_mask(fields=['W2']) or warning
+        warning = run_mask() or warning
     if is_run_cat:
         warning = run_cat() or warning
     if is_run_mult:

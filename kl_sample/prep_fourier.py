@@ -10,7 +10,11 @@ import os
 import sys
 import re
 import numpy as np
+import urllib
 import time
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
 from astropy.io import fits
 from astropy import wcs
 import settings as set
@@ -38,22 +42,10 @@ def prep_fourier(args):
     fields = set.FIELDS_CFHTLENS
     # List of redshift bins
     z_bins = np.array([[set.Z_BINS[n], set.Z_BINS[n+1]] for n in np.arange(len(set.Z_BINS)-1)])
+    # Size pixels masks in arcsecs (it has to be an integer number)
+    size_pix = 120
     # Range of pixels used to average the multiplicative correction
     n_avg_m = 5
-
-
-
-# ------------------- Useful functions ----------------------------------------#
-
-    def timing(fun, name):
-        warning = False
-        start = time.clock()
-        warning = fun
-        end = time.clock()
-        hours, rem = divmod(end-start, 3600)
-        minutes, seconds = divmod(rem, 60)
-        print 'Run {} module in {:0>2} Hours {:0>2} Minutes {:05.2f} Seconds!'.format(name,int(hours),int(minutes),seconds)
-        return warning
 
 
 
@@ -71,6 +63,7 @@ def prep_fourier(args):
         path['map_'+f] = path['base']+'/'+path['fname']+'map_'+f+'.fits'
         path['mask_'+f] = path['base']+'/mask_'+f+'.fits'
         path['m_'+f] = path['base']+'/mult_corr_'+f+'.fits'
+        path['mask_sec_'+f] = path['base']+'/mask_arcsec_'+f+'.fits.gz'
 
     # Determine which modules have to be run, by checking the existence of the
     # output files and arguments passed by the user
@@ -93,7 +86,8 @@ def prep_fourier(args):
     # Check the existence of the required input files
     if is_run_mask:
         nofile1 = not(os.path.exists(path['mask_url']))
-        if nofile1:
+        nofile2 = np.array([not(os.path.exists(path['mask_sec_'+f])) for f in fields]).any()
+        if nofile1 or nofile2:
             print 'WARNING: I will skip the MASK module. Input files not found!'
             sys.stdout.flush()
             is_run_mask = False
@@ -112,8 +106,9 @@ def prep_fourier(args):
         print 'I will skip the CATALOGUE module. Output files already there!'
         sys.stdout.flush()
     if is_run_mult:
-        nofile1 = np.array([not(os.path.exists(path['cat_'+f])) for f in fields]).any()
-        if not(is_run_cat) and nofile1:
+        nofile1 = np.array([not(os.path.exists(path['mask_'+f])) for f in fields]).any()
+        nofile2 = np.array([not(os.path.exists(path['cat_'+f])) for f in fields]).any()
+        if (not(is_run_mask) and nofile1) or (not(is_run_cat) and nofile2):
             print 'WARNING: I will skip the MULT_CORR module. Input file not found!'
             sys.stdout.flush()
             is_run_mult = False
@@ -133,9 +128,10 @@ def prep_fourier(args):
         print 'I will skip the PHOTO_Z module. Output file already there!'
         sys.stdout.flush()
     if is_run_map:
-        nofile1 = np.array([not(os.path.exists(path['cat_'+f])) for f in fields]).any()
-        nofile2 = np.array([not(os.path.exists(path['m_'+f])) for f in fields]).any()
-        if (not(is_run_cat) and nofile1) or (not(is_run_mult) and nofile2):
+        nofile1 = np.array([not(os.path.exists(path['mask_'+f])) for f in fields]).any()
+        nofile2 = np.array([not(os.path.exists(path['cat_'+f])) for f in fields]).any()
+        nofile3 = np.array([not(os.path.exists(path['m_'+f])) for f in fields]).any()
+        if (not(is_run_mask) and nofile1) or (not(is_run_cat) and nofile2) or (not(is_run_mult) and nofile3):
             print 'WARNING: I will skip the MAP module. Input files not found!'
             sys.stdout.flush()
             is_run_map = False
@@ -148,7 +144,7 @@ def prep_fourier(args):
 
 # ------------------- Function to calculate the mask --------------------------#
 
-    def run_mask(path=path, fields=fields, z_bins=z_bins):
+    def run_mask(path=path, fields=fields, z_bins=z_bins, size_pix=size_pix):
 
         print 'Running MASK module'
         sys.stdout.flush()
@@ -166,145 +162,151 @@ def prep_fourier(args):
             except:
                 pass
 
-            # Get urls for the sub-masks
+
+            # Read urls where to find coordinates of the bad fields
             urls = []
             with open(path['mask_url'], 'r') as fn:
                 for line in fn:
-                    if re.match('.+'+f+'.+finalmask_mosaic.fits', line):
+                    cond1 = re.match('.+'+f+'.+finalmask_mosaic.fits', line)
+                    cond2 = not(np.array([re.match('.+'+x+'.+', line) for x in set.good_fit_patterns])).any()
+                    if cond1 and cond2:
                         urls.append(line.rstrip())
 
 
+            # Read mask data
+            imname = 'primary'
+            fname = path['mask_sec_'+f]
+            try:
+                mask_sec = io.read_from_fits(fname, imname)
+            except KeyError:
+                print 'WARNING: No key '+imname+' in '+fname+'. Skipping calculation!'
+                return True
+            # Read mask header and check necessary keys
+            try:
+                hd_sec = io.read_header_from_fits(fname, imname)
+                # Create a WCS object for mask_sec
+                w_sec = wcs.WCS(hd_sec)
+            except KeyError:
+                print 'WARNING: No header in '+fname+'. Skipping calculation!'
+                return True
+            for key in ['CRPIX1','CRPIX2','CD1_1','CD2_2','CRVAL1','CRVAL2','CTYPE1','CTYPE2']:
+                if key not in list(hd_sec.keys()):
+                    print 'WARNING: No key '+key+' in '+fname+'. Skipping calculation!'
+                    return True
 
-    #     # Function that read necessary data and check their internal structure
-    #     def read_mask(fname, imname='PRIMARY',
-    #             keys=['CRPIX1','CRPIX2','CD1_1','CD2_2','CRVAL1','CRVAL2','CTYPE1','CTYPE2']):
-    #
-    #         # Read the image
-    #         try:
-    #             mask = io.read_from_fits(fname, imname).astype(int)
-    #         except KeyError:
-    #             print 'WARNING: No image '+imname+' in '+fname+'. Skipping calculation!'
-    #             return None, None, True
-    #         # Read the header
-    #         try:
-    #             hd = io.read_header_from_fits(fname, imname)
-    #             hd = dict([(x,hd[x]) for x in keys])
-    #         except KeyError:
-    #             print 'WARNING: Header ill defined in '+fname+', missing parameters. Skipping calculation!'
-    #             return None, None, True
-    #
-    #         return mask, hd, warning
-    #
-    #
-    #     # Function to degrade boolean masks
-    #     def degrade_mask(mask, hd, size_pix=size_pix):
-    #
-    #         # Calculate new dimensions
-    #         ratio_pix1 = abs(size_pix/hd['CD1_1']/60.**2)
-    #         ratio_pix2 = abs(size_pix/hd['CD2_2']/60.**2)
-    #
-    #         # print mask.shape
-    #         # print size_pix
-    #         # print hd
-    #
-    #
-    #
-    # #     div1, mod1 = np.divmod(mask_orig.shape[0], dim_ratio)
-    # #     div2, mod2 = np.divmod(mask_orig.shape[1], dim_ratio)
-    # #     if mod1 == 0:
-    # #         x1 = div1
-    # #     else:
-    # #         x1 = div1+1
-    # #     if mod2 == 0:
-    # #         x2 = div2
-    # #     else:
-    # #         x2 = div2+1
-    # #     start1 = int(np.round((x1*dim_ratio-mask_orig.shape[0])/2.))
-    # #     start2 = int(np.round((x2*dim_ratio-mask_orig.shape[1])/2.))
-    # #     end1 = start1+mask_orig.shape[0]
-    # #     end2 = start2+mask_orig.shape[1]
-    # #
-    # #     # Add borders to the mask
-    # #     mask_orig_ext = np.zeros((x1*dim_ratio, x2*dim_ratio), dtype=bool)
-    # #     mask_orig_ext[start1:end1,start2:end2] = mask_orig
-    # #     print '----> Extended shape: ', mask_orig_ext.shape
-    # #     sys.stdout.flush()
-    # #
-    # #     # Calculate new mask
-    # #     mask = np.zeros((x1, x2))
-    # #     for count1 in range(x1):
-    # #         for count2 in range(x2):
-    # #             s1 = count1*dim_ratio
-    # #             s2 = count2*dim_ratio
-    # #             new_pix = mask_orig_ext[s1:s1+dim_ratio,s2:s2+dim_ratio].astype(float)
-    # #             mask[count1,count2] = np.average(new_pix)
-    #
-    # #     add1 = float(x1)*dim_ratio/mask_orig.shape[0]-1.
-    # #     add2 = float(x2)*dim_ratio/mask_orig.shape[1]-1.
-    # #     print '----> Pixels added: '+'({0:5.2%}, '.format(add1)+'{0:5.2%})'.format(add2)
-    # #     sys.stdout.flush()
-    # #
-    # #     # Create a WCS object and save it to file
-    # #     hd = io.read_header_from_fits(path['mask_'+f], 'primary')
-    # #     # Create a new WCS object
-    # #     w = wcs.WCS(naxis=2)
-    # #     # Write header
-    # #     w.wcs.crpix = np.array([start1+hd['CRPIX1'], start2+hd['CRPIX2']])/dim_ratio
-    # #     w.wcs.cdelt = np.array([hd['CD1_1'], hd['CD2_2']])*dim_ratio
-    # #     w.wcs.crval = np.array([hd['CRVAL1'], hd['CRVAL2']])
-    # #     w.wcs.ctype = [hd['CTYPE1'], hd['CTYPE2']]
-    # #     hd = w.to_header()
-    #
-    #         return mask, hd
-    #
-    #
-    #     # Main loop: scan over the fields and generate new maps
-    #     for f in fields:
-    #         print 'Calculating mask for field ' + f + ':'
-    #         sys.stdout.flush()
-    #
-    #         # Remove old output file to avoid confusion
-    #         try:
-    #             os.remove(path['mask_'+f])
-    #         except:
-    #             pass
-    #
-    #         # Read masks
-    #         mask_sec, hd_sec, warning = read_mask(path['mask_sec_'+f])
-    #         mask_gb, hd_gb, warning = read_mask(path['good_bad_'+f])
-    #         if abs(hd_sec['CRVAL1']/hd_gb['CRVAL1']-1.)>1.e-5 or abs(hd_sec['CRVAL2']/hd_gb['CRVAL2']-1.)>1.e-5:
-    #             print 'WARNING: Central position of the two masks is different. Skipping calculation!'
-    #             warning = True
-    #         if warning:
-    #             continue
-    #
-    #         # Convert masks to boolean
-    #         mask_sec = (1-np.array(mask_sec, dtype=bool)).astype(bool)
-    #         print '----> Shape arcsec mask: ', mask_sec.shape
-    #         sys.stdout.flush()
-    #         mask_gb = np.array(mask_gb, dtype=bool)
-    #         print '----> Shape good_bad mask: ', mask_gb.shape
-    #         sys.stdout.flush()
-    #
-    #         # Degrade masks
-    #         mask_min, hd_min = degrade_mask(mask_sec, hd_sec)
-    #         print '----> Shape arcmin mask: ', mask_min.shape
-    #         sys.stdout.flush()
-    #         mask_gb, hd_gb = degrade_mask(mask_gb, hd_gb)
-    #         print '----> New shape good_bad mask: ', mask_min.shape
-    #         sys.stdout.flush()
+            # Convert mask to boolean
+            mask_sec = (1-np.array(mask_sec, dtype=bool)).astype(bool)
+
+
+            # Remove bad fields from mask_sec
+            imname = 'primary'
+            for url in urls:
+                badname = path['base']+'/'+os.path.split(url)[1]
+                # Get the file if it is not there
+                if not(os.path.exists(badname)):
+                    urllib.urlretrieve(url, badname)
+                # Read the mask
+                mask_bad = io.read_from_fits(badname, imname)
+                hd_bad = io.read_header_from_fits(badname, imname)
+                w_bad = wcs.WCS(hd_bad)
+                # Find pixels inside the field
+                pos_bad = np.stack(np.where(mask_bad<8192), axis=-1)
+                for p in pos_bad:
+                    pix = w_bad.wcs_pix2world([p], 1)
+                    pix = w_sec.wcs_world2pix(pix, 1).astype(int)
+                    pix = np.flip(pix,axis=1) #Need to invert the columns
+                    # Set to zero pixels inside the field
+                    mask_sec[tuple(pix[0])] = 0.
+                # Remove file to save space
+                # os.remove(badname) TODO:uncomment this
 
 
 
+                # # Find borders of the mask
+                # mask_bad = (mask_bad-8192).astype(bool).astype(int)
+                # sh1 = mask_bad.shape[0]+2
+                # sh2 = mask_bad.shape[1]+2
+                # mask_bad_ext = np.zeros((sh1, sh2), dtype=int)
+                # mask_bad_ext_old = np.zeros((sh1, sh2), dtype=int)
+                # mask_bad_ext[1:sh1-1, 1:sh2-1] = mask_bad
+                # mask_bad_ext_old[1:sh1-1, 1:sh2-1] = mask_bad
+                # mask_bad_ext[0:-2,0:-2] += mask_bad
+                # mask_bad_ext[0:-2,1:-1] += mask_bad
+                # mask_bad_ext[0:-2,2:  ] += mask_bad
+                # mask_bad_ext[1:-1,0:-2] += mask_bad
+                # mask_bad_ext[1:-1,2:  ] += mask_bad
+                # mask_bad_ext[2:  ,0:-2] += mask_bad
+                # mask_bad_ext[2:  ,1:-1] += mask_bad
+                # mask_bad_ext[2:  ,2:  ] += mask_bad
+                # mask_bad_ext[mask_bad_ext > 8] = 0
+                # bord = np.where(mask_bad_ext_old*mask_bad_ext>0)
+                # print bord
+                # b2, b1 = np.where(mask_bad_ext_old*mask_bad_ext>0)
+                # b1 += -1
+                # b2 += -1
+
+
+
+            # Determine how many pixels should be grouped together in the degraded mask
+            dim_ratio =int(np.round(abs(size_pix/(hd_sec['CD1_1']*60.**2))))
+            cond1 = abs(dim_ratio/abs(size_pix/(hd_sec['CD1_1']*60.**2))-1)>1e-6
+            cond2 = abs(dim_ratio/abs(size_pix/(hd_sec['CD2_2']*60.**2))-1)>1e-6
+            if cond1 or cond2:
+                print 'WARNING: Invalid pixel dimensions. Skipping calculation!'
+                return True
+
+            # Calculate how many pixels should be added to the original mask
+            div1, mod1 = np.divmod(mask_sec.shape[0], dim_ratio)
+            div2, mod2 = np.divmod(mask_sec.shape[1], dim_ratio)
+            if mod1 == 0:
+                x1 = div1
+            else:
+                x1 = div1+1
+            if mod2 == 0:
+                x2 = div2
+            else:
+                x2 = div2+1
+            start1 = int(np.round((x1*dim_ratio-mask_sec.shape[0])/2.))
+            start2 = int(np.round((x2*dim_ratio-mask_sec.shape[1])/2.))
+            end1 = start1+mask_sec.shape[0]
+            end2 = start2+mask_sec.shape[1]
+
+            # Add borders to the mask
+            mask_ext = np.zeros((x1*dim_ratio, x2*dim_ratio), dtype=bool)
+            mask_ext[start1:end1,start2:end2] = mask_sec
+
+            # Calculate new mask
+            mask = np.zeros((x1, x2))
+            for count1 in range(x1):
+                for count2 in range(x2):
+                    s1 = count1*dim_ratio
+                    s2 = count2*dim_ratio
+                    new_pix = mask_ext[s1:s1+dim_ratio,s2:s2+dim_ratio].astype(float)
+                    mask[count1,count2] = np.average(new_pix)
+
+            # Create header
+            w = wcs.WCS(naxis=2)
+            w.wcs.crpix = np.array([start1+hd_sec['CRPIX1'], start2+hd_sec['CRPIX2']])/dim_ratio
+            w.wcs.cdelt = np.array([hd_sec['CD1_1'], hd_sec['CD2_2']])*dim_ratio
+            w.wcs.crval = np.array([hd_sec['CRVAL1'], hd_sec['CRVAL2']])
+            w.wcs.ctype = [hd_sec['CTYPE1'], hd_sec['CTYPE2']]
+            hd = w.to_header()
+
+            # Save to file the map
+            name = 'MASK_{}'.format(f)
+            warning = io.write_to_fits(path['mask_'+f], mask, name, header=hd, type='image') or warning
+
+            io.print_info_fits(path['mask_'+f])
+
+            # Generate plots
+            if args.want_plots:
+                plt.imshow(mask,interpolation='nearest')
+                plt.colorbar()
+                plt.savefig(path['base']+'/mask_'+f+'.pdf')
+                plt.close()
 
 
         return warning
-
-
-
-    #     # Write to file
-    #     fname = path['input']+'/'+f+'_mask.fits'
-    #     io.write_to_fits(fname, mask, f+'_mask', header=hd)
 
 
 
@@ -363,7 +365,7 @@ def prep_fourier(args):
                         columns.append(fits.Column(name=key,array=gals[key],format='E'))
                 name = 'CAT_{}_Z{}'.format(f, n_z_bin+1)
                 gals = fits.BinTableHDU.from_columns(columns, name=name)
-                warning = io.write_to_fits(path['cat_'+f], gals, name, type='table')
+                warning = io.write_to_fits(path['cat_'+f], gals, name, type='table') or warning
 
             io.print_info_fits(path['cat_'+f])
 
@@ -397,79 +399,80 @@ def prep_fourier(args):
                 return True
 
 
-        # Main loop: scan over the fields
-        for f in fields:
-
-            # Remove old output file to avoid confusion
-            try:
-                os.remove(path['m_'+f])
-            except:
-                pass
-
-            # Create a new WCS object
-            pars = set.image_pars[f]
-            w = wcs.WCS(naxis=pars['NAXIS'])
-            w.wcs.crpix = [pars['CRPIX1'], pars['CRPIX2']]
-            w.wcs.cdelt = [pars['CDELT1'], pars['CDELT1']]
-            w.wcs.crval = [pars['CRVAL1'], pars['CRVAL2']]
-            w.wcs.ctype = [pars['CTYPE1'], pars['CTYPE2']]
-            hd = w.to_header()
-
-            # Second loop to divide galaxies in redshift bins
-            for n_z_bin, z_bin in enumerate(z_bins):
-
-                print 'Calculating multiplicative correction for field ' + f + ' and bin {}:'.format(n_z_bin+1)
-                sys.stdout.flush()
-
-
-                # Create an empty array for the multiplicative correction
-                mult_corr = np.zeros((pars['NAXIS1'], pars['NAXIS1']))
-
-                # Filter galaxies
-                filter = set.filter_galaxies(cat, z_bin[0], z_bin[1], field=f)
-                gals = cat[filter]
-
-                # Get World position of each galaxy
-                pos = zip(gals['ALPHA_J2000'],gals['DELTA_J2000'])
-                # Calculate Pixel position of each galaxy
-                pos = w.wcs_world2pix(pos, 1).astype(int)
-                pos = np.flip(pos,axis=1) #Need to invert the columns
-                # Pixels where at least one galaxy has been found
-                pos_unique = np.unique(pos, axis=0)
-                # Scan over the populated pixels
-                for count, pix in enumerate(pos_unique):
-                    # Calculate range of pixels to average
-                    if pix[0]-n_avg_m<0:
-                        s1 = 0
-                    elif pix[0]+n_avg_m>=mult_corr.shape[0]:
-                        s1 = mult_corr.shape[0]-(2*n_avg_m+1)
-                    else:
-                        s1 = pix[0]-n_avg_m
-                    if pix[1]-n_avg_m<0:
-                        s2 = 0
-                    elif pix[1]+n_avg_m>=mult_corr.shape[1]:
-                        s2 = mult_corr.shape[1]-(2*n_avg_m+1)
-                    else:
-                        s2 = pix[1]-n_avg_m
-                    # Select galaxies in range of pixels
-                    sel = pos[:,0] >= s1
-                    sel = (pos[:,0] < s1+2*n_avg_m+1)*sel
-                    sel = (pos[:,1] >= s2)*sel
-                    sel = (pos[:,1] < s2+2*n_avg_m+1)*sel
-                    m = gals[sel]['m']
-                    weight = gals[sel]['weight']
-                    mult_corr[tuple(pix)] = np.average(m, weights=weight)
-
-                    # Print message every some step
-                    if (count+1) % 1e3 == 0:
-                        print '----> Done {0:5.1%} of the pixels ({1:d})'.format(float(count+1) /len(pos_unique), len(pos_unique))
-                        sys.stdout.flush()
-
-                # Save to file the map
-                name = 'MULT_CORR_{}_Z{}'.format(f, n_z_bin+1)
-                warning = io.write_to_fits(path['m_'+f], mult_corr, name, header=hd, type='image')
-
-            io.print_info_fits(path['m_'+f])
+        # # Main loop: scan over the fields
+        # for f in fields:
+        #
+        #     # Remove old output file to avoid confusion
+        #     try:
+        #         os.remove(path['m_'+f])
+        #     except:
+        #         pass
+        #
+        #     # Create a new WCS object
+        #     pars = set.image_pars[f]
+        #     w = wcs.WCS(naxis=pars['NAXIS'])
+        #     w.wcs.crpix = [pars['CRPIX1'], pars['CRPIX2']]
+        #     w.wcs.cdelt = [pars['CDELT1'], pars['CDELT1']]
+        #     w.wcs.crval = [pars['CRVAL1'], pars['CRVAL2']]
+        #     w.wcs.ctype = [pars['CTYPE1'], pars['CTYPE2']]
+        #     hd = w.to_header()
+        #
+        #     # Second loop to divide galaxies in redshift bins
+        #     for n_z_bin, z_bin in enumerate(z_bins):
+        #
+        #         print 'Calculating multiplicative correction for field ' + f + ' and bin {}:'.format(n_z_bin+1)
+        #         sys.stdout.flush()
+        #
+        #
+        #         # Create an empty array for the multiplicative correction
+        #         mult_corr = np.zeros((pars['NAXIS1'], pars['NAXIS1']))
+        #
+        #         # Filter galaxies
+        #         filter = set.filter_galaxies(cat, z_bin[0], z_bin[1], field=f)
+        #         gals = cat[filter]
+        #
+        #         # Get World position of each galaxy
+        #         pos = zip(gals['ALPHA_J2000'],gals['DELTA_J2000'])
+        #         # Calculate Pixel position of each galaxy
+        #         pos = w.wcs_world2pix(pos, 1).astype(int)
+        #         pos = np.flip(pos,axis=1) #Need to invert the columns
+        #         # Pixels where at least one galaxy has been found
+        #         pos_unique = np.unique(pos, axis=0)
+        #         print pos_unique
+        #         # Scan over the populated pixels
+        #         for count, pix in enumerate(pos_unique):
+        #             # Calculate range of pixels to average
+        #             if pix[0]-n_avg_m<0:
+        #                 s1 = 0
+        #             elif pix[0]+n_avg_m>=mult_corr.shape[0]:
+        #                 s1 = mult_corr.shape[0]-(2*n_avg_m+1)
+        #             else:
+        #                 s1 = pix[0]-n_avg_m
+        #             if pix[1]-n_avg_m<0:
+        #                 s2 = 0
+        #             elif pix[1]+n_avg_m>=mult_corr.shape[1]:
+        #                 s2 = mult_corr.shape[1]-(2*n_avg_m+1)
+        #             else:
+        #                 s2 = pix[1]-n_avg_m
+        #             # Select galaxies in range of pixels
+        #             sel = pos[:,0] >= s1
+        #             sel = (pos[:,0] < s1+2*n_avg_m+1)*sel
+        #             sel = (pos[:,1] >= s2)*sel
+        #             sel = (pos[:,1] < s2+2*n_avg_m+1)*sel
+        #             m = gals[sel]['m']
+        #             weight = gals[sel]['weight']
+        #             mult_corr[tuple(pix)] = np.average(m, weights=weight)
+        #
+        #             # Print message every some step
+        #             if (count+1) % 1e3 == 0:
+        #                 print '----> Done {0:5.1%} of the pixels ({1:d})'.format(float(count+1) /len(pos_unique), len(pos_unique))
+        #                 sys.stdout.flush()
+        #
+        #         # Save to file the map
+        #         name = 'MULT_CORR_{}_Z{}'.format(f, n_z_bin+1)
+        #         warning = io.write_to_fits(path['m_'+f], mult_corr, name, header=hd, type='image') or warning
+        #
+        #     io.print_info_fits(path['m_'+f])
 
         return warning
 
@@ -502,15 +505,40 @@ def prep_fourier(args):
 # ------------------- Pipeline ------------------------------------------------#
 
     if is_run_mask:
-        warning = timing(run_mask(), 'MASK') or warning
-    if is_run_cat:
-        warning = timing(run_cat(), 'CATALOGUE') or warning
-    if is_run_mult:
-        warning = timing(run_mult(), 'MULT_CORR') or warning
-    if is_run_pz:
-        warning = timing(run_pz(), 'PHOTO_Z') or warning
-    if is_run_map:
-        warning = timing(run_map(), 'MAP') or warning
+        start = time.clock()
+        warning = run_mask() or warning
+        end = time.clock()
+        hrs, rem = divmod(end-start, 3600)
+        mins, secs = divmod(rem, 60)
+        print 'Run MASK module in {:0>2} Hours {:0>2} Minutes {:05.2f} Seconds!'.format(int(hrs),int(mins),secs)
+    # if is_run_cat:
+    #     start = time.clock()
+    #     warning = run_cat() or warning
+    #     end = time.clock()
+    #     hrs, rem = divmod(end-start, 3600)
+    #     mins, secs = divmod(rem, 60)
+    #     print 'Run CATALOGUE module in {:0>2} Hours {:0>2} Minutes {:05.2f} Seconds!'.format(int(hrs),int(mins),secs)
+    # if is_run_mult:
+    #     start = time.clock()
+    #     warning = run_mult() or warning
+    #     end = time.clock()
+    #     hrs, rem = divmod(end-start, 3600)
+    #     mins, secs = divmod(rem, 60)
+    #     print 'Run MULT_CORR module in {:0>2} Hours {:0>2} Minutes {:05.2f} Seconds!'.format(int(hrs),int(mins),secs)
+    # if is_run_pz:
+    #     start = time.clock()
+    #     warning = run_pz() or warning
+    #     end = time.clock()
+    #     hrs, rem = divmod(end-start, 3600)
+    #     mins, secs = divmod(rem, 60)
+    #     print 'Run PHOTO_Z module in {:0>2} Hours {:0>2} Minutes {:05.2f} Seconds!'.format(int(hrs),int(mins),secs)
+    # if is_run_map:
+    #     start = time.clock()
+    #     warning = run_map() or warning
+    #     end = time.clock()
+    #     hrs, rem = divmod(end-start, 3600)
+    #     mins, secs = divmod(rem, 60)
+    #     print 'Run MAP module in {:0>2} Hours {:0>2} Minutes {:05.2f} Seconds!'.format(int(hrs),int(mins),secs)
 
     if warning:
         print 'Done! However something went unexpectedly!! Check your warnings!'

@@ -78,6 +78,8 @@ def argument_parser():
         'routine even if the files are already present', action='store_true')
     prep_fourier_parser.add_argument('--run_pz', '-pz', help='Run photo_z routine '
         'even if the files are already present', action='store_true')
+    prep_fourier_parser.add_argument('--want_plots', '-p', help='Generate plots for the images',
+        action='store_true')
     #Arguments for 'get_kl'
     get_kl_parser.add_argument('params_file', type=str, help='Parameters file')
 

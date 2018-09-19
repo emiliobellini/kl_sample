@@ -46,13 +46,14 @@ MASK_THETA   = np.array([
 
 
 # CFHTlens specifications plus area of simulations
+FIELDS_CFHTLENS = ['W'+str(x+1) for x in range(4)]
 dZ_CFHTlens = 0.05
 A_CFHTlens = np.array([42.90, 12.10, 26.10, 13.30])*(60.**2.) #in arcmin^-2
 A_sims = np.array([12.72, 10.31, 12.01, 10.38])*(60.**2.) #in arcmin^-2
 
 
 # Criteria used to select the data
-def get_mask(data, z_min, z_max):
+def filter_galaxies(data, z_min, z_max, field='all'):
 
     sel = data['Z_B']>=z_min
     sel = (data['Z_B']<z_max)*sel
@@ -60,6 +61,8 @@ def get_mask(data, z_min, z_max):
     sel = (data['weight']>0.)*sel
     sel = (data['star_flag']==0)*sel
     sel = np.array([x[:6] in good_fit_patterns for x in data['id']])*sel
+    if field in FIELDS_CFHTLENS:
+        sel = np.array([x[:2] in field for x in data['id']])*sel
 
     return sel
 

@@ -393,7 +393,7 @@ def read_photo_z_data(fname):
 
     # Local variables
     z_bins = np.array([[set.Z_BINS[n], set.Z_BINS[n+1]] for n in np.arange(len(set.Z_BINS)-1)])
-    sel_bins = np.array([set.get_mask(table, z_bins[n][0], z_bins[n][1]) for n in range(len(z_bins))])
+    sel_bins = np.array([set.filter_galaxies(table, z_bins[n][0], z_bins[n][1]) for n in range(len(z_bins))])
     photo_z = np.zeros((len(z_bins)+1,len(image[0])))
     n_eff = np.zeros(len(z_bins))
     sigma_g = np.zeros(len(z_bins))

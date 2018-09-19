@@ -10,6 +10,7 @@ import os
 import sys
 import re
 import numpy as np
+import time
 from astropy.io import fits
 # from astropy import wcs
 import settings as set
@@ -34,11 +35,9 @@ def prep_fourier(args):
     # Global variable collecting warnings
     warning = False
     # List of CFHTlens fields
-    fields = ['W'+str(x+1) for x in range(4)]
+    fields = set.FIELDS_CFHTLENS
     # List of redshift bins
     z_bins = np.array([[set.Z_BINS[n], set.Z_BINS[n+1]] for n in np.arange(len(set.Z_BINS)-1)])
-    # Size in arcsec of the degraded masks and of the maps
-    size_pix = 120.
 
 
 
@@ -53,9 +52,9 @@ def prep_fourier(args):
     path['mask_url'] = path['base']+'/mask_url.txt'
     for f in fields:
         path['cat_'+f] = path['base']+'/'+path['fname']+'cat_'+f+'.fits'
-        path['m_'+f] = path['base']+'/'+path['fname']+'mult_corr_'+f+'.fits'
         path['map_'+f] = path['base']+'/'+path['fname']+'map_'+f+'.fits'
         path['mask_'+f] = path['base']+'/mask_'+f+'.fits'
+        path['m_'+f] = path['base']+'/mult_corr_'+f+'.fits'
 
     # Determine which modules have to be run, by checking the existence of the
     # output files and arguments passed by the user
@@ -95,8 +94,7 @@ def prep_fourier(args):
         sys.stdout.flush()
     if is_run_mult:
         nofile1 = np.array([not(os.path.exists(path['cat_'+f])) for f in fields]).any()
-        nofile2 = np.array([not(os.path.exists(path['mask_'+f])) for f in fields]).any()
-        if (not(is_run_cat) and nofile1) or (not(is_run_mask) and nofile2):
+        if not(is_run_cat) and nofile1:
             print 'WARNING: I will skip module to calculate the multiplicative correction. Input files not found!'
             sys.stdout.flush()
             is_run_mult = False
@@ -106,8 +104,8 @@ def prep_fourier(args):
         sys.stdout.flush()
     if is_run_map:
         nofile1 = np.array([not(os.path.exists(path['cat_'+f])) for f in fields]).any()
-        nofile2 = np.array([not(os.path.exists(path['mask_'+f])) for f in fields]).any()
-        if (not(is_run_cat) and nofile1) or (not(is_run_mask) and nofile2):
+        nofile2 = np.array([not(os.path.exists(path['m_'+f])) for f in fields]).any()
+        if (not(is_run_cat) and nofile1) or (not(is_run_mult) and nofile2):
             print 'WARNING: I will skip module to calculate the map. Input files not found!'
             sys.stdout.flush()
             is_run_map = False
@@ -120,7 +118,7 @@ def prep_fourier(args):
 
 # ------------------- Function to calculate the mask --------------------------#
 
-    def run_mask(path=path, fields=fields, z_bins=z_bins, size_pix=size_pix):
+    def run_mask(path=path, fields=fields, z_bins=z_bins):
 
         print 'Running mask module'
         sys.stdout.flush()
@@ -289,23 +287,22 @@ def prep_fourier(args):
         warning = False
 
 
-        # Read galaxy catalogue (including photo_z)
-        data = {}
-        keys = ['data','pz_full']
+        # Read galaxy catalogue
+        table_name = 'data'
         fname = path['cat_full']
-        for key in keys:
-            try:
-                data[key] = io.read_from_fits(fname, key)
-            except KeyError:
-                print 'WARNING: No key '+key+' in '+fname+'. Skipping calculation!'
+        try:
+            cat = io.read_from_fits(fname, table_name)
+        except KeyError:
+            print 'WARNING: No key '+table_name+' in '+fname+'. Skipping calculation!'
+            return True
+
+        # Check that the table has the correct columns
+        table_keys = ['ALPHA_J2000', 'DELTA_J2000', 'e1', 'e2', 'c2', 'weight', 'id', 'Z_B', 'MASK', 'star_flag']
+        for key in table_keys:
+            if key not in cat.columns.names:
+                print 'WARNING: No key '+key+' in table of '+fname+'. Skipping calculation!'
                 return True
 
-
-        # Function that filters the galaxies
-        def filter_gals(gals, field, z_bin):
-            sel = set.get_mask(gals, z_bin[0], z_bin[1])
-            sel = np.array([x[:2] in field for x in gals['id']])*sel
-            return sel
 
         # Main loop: scan over the fields and generate new maps
         for f in fields:
@@ -317,9 +314,8 @@ def prep_fourier(args):
                 sys.stdout.flush()
 
                 # Filter galaxies
-                filter = filter_gals(data['data'], f, z_bin)
-                gals = data['data'][filter]
-                pz = data['pz_full'][filter]
+                filter = set.filter_galaxies(cat, z_bin[0], z_bin[1], field=f)
+                gals = cat[filter]
 
                 # Create Table and save it
                 table_keys = ['ALPHA_J2000', 'DELTA_J2000', 'e1', 'e2', 'c1', 'c2', 'weight']
@@ -332,10 +328,6 @@ def prep_fourier(args):
                 name = 'CAT_{}_Z{}'.format(f, n_z_bin+1)
                 gals = fits.BinTableHDU.from_columns(columns, name=name)
                 warning = io.write_to_fits(path['cat_'+f], gals, name, type='table')
-
-                # Save image
-                name = 'PZ_{}_Z{}'.format(f, n_z_bin+1)
-                warning = io.write_to_fits(path['cat_'+f], pz, name, type='image')
 
             io.print_info_fits(path['cat_'+f])
 
@@ -362,13 +354,33 @@ def prep_fourier(args):
 # ------------------- Pipeline ------------------------------------------------#
 
     if is_run_mask:
+        start = time.clock()
         warning = run_mask() or warning
+        end = time.clock()
+        hours, rem = divmod(end-start, 3600)
+        minutes, seconds = divmod(rem, 60)
+        print 'Run mask module in {:0>2} Hours {:0>2} Minutes {:05.2f} Seconds!'.format(int(hours),int(minutes),seconds)
     if is_run_cat:
-        warning = run_cat(fields=['W3']) or warning
+        start = time.clock()
+        warning = run_cat() or warning
+        end = time.clock()
+        hours, rem = divmod(end-start, 3600)
+        minutes, seconds = divmod(rem, 60)
+        print 'Run catalogue module in {:0>2} Hours {:0>2} Minutes {:05.2f} Seconds!'.format(int(hours),int(minutes),seconds)
     if is_run_mult:
+        start = time.clock()
         warning = run_mult() or warning
+        end = time.clock()
+        hours, rem = divmod(end-start, 3600)
+        minutes, seconds = divmod(rem, 60)
+        print 'Run multiplicative correction module in {:0>2} Hours {:0>2} Minutes {:05.2f} Seconds!'.format(int(hours),int(minutes),seconds)
     if is_run_map:
+        start = time.clock()
         warning = run_map() or warning
+        end = time.clock()
+        hours, rem = divmod(end-start, 3600)
+        minutes, seconds = divmod(rem, 60)
+        print 'Run map module in {:0>2} Hours {:0>2} Minutes {:05.2f} Seconds!'.format(int(hours),int(minutes),seconds)
 
     if warning:
         print 'Done! However something went unexpectedly!! Check your warnings!'
@@ -398,11 +410,6 @@ def prep_fourier(args):
     # gals = io.read_from_fits(path['input']+'/data.fits', 'data')
     #
     #
-    # # Function that filters the galaxies
-    # def filter_gals(gals, field, z_bin):
-    #     sel = set.get_mask(gals, z_bin[0], z_bin[1])
-    #     sel = np.array([x[:2] in field for x in gals['id']])*sel
-    #     return sel
     #
     #
     # # Main loop to scan over the fields
@@ -423,7 +430,7 @@ def prep_fourier(args):
     #         map_2 = np.zeros(mask.shape)
     #
     #         # Filter galaxies
-    #         gals_f = gals[filter_gals(gals, f, z_bin)]
+    #         gals_f = gals[set.filter_galaxies(gals, z_bin[0], z_bin[1], field=f)]
     #
     #         # World position
     #         pos_w = np.array([[gals_f['ALPHA_J2000'][x],gals_f['DELTA_J2000'][x]] for x in range(len(gals_f))])

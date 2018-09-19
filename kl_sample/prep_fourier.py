@@ -12,7 +12,7 @@ import re
 import numpy as np
 import time
 from astropy.io import fits
-# from astropy import wcs
+from astropy import wcs
 import settings as set
 import io
 
@@ -38,6 +38,8 @@ def prep_fourier(args):
     fields = set.FIELDS_CFHTLENS
     # List of redshift bins
     z_bins = np.array([[set.Z_BINS[n], set.Z_BINS[n+1]] for n in np.arange(len(set.Z_BINS)-1)])
+    # Range of pixels used to average the multiplicative correction
+    n_avg_m = 5
 
 
 
@@ -332,7 +334,7 @@ def prep_fourier(args):
                 return True
 
 
-        # Main loop: scan over the fields and generate new maps
+        # Main loop: scan over the fields
         for f in fields:
 
             # Remove old output file to avoid confusion
@@ -371,8 +373,104 @@ def prep_fourier(args):
 
 # ------------------- Function to calculate the multiplicative correction -----#
 
-    def run_mult(path=path, fields=fields, z_bins=z_bins):
+    def run_mult(path=path, fields=fields, z_bins=z_bins, n_avg_m=n_avg_m):
+
+        print 'Running MULT_CORR module'
+        sys.stdout.flush()
         warning = False
+
+
+        # Read galaxy catalogue
+        table_name = 'data'
+        fname = path['cat_full']
+        try:
+            cat = io.read_from_fits(fname, table_name)
+        except KeyError:
+            print 'WARNING: No key '+table_name+' in '+fname+'. Skipping calculation!'
+            return True
+
+        # Check that the table has the correct columns
+        table_keys = ['ALPHA_J2000', 'DELTA_J2000', 'm', 'weight', 'id', 'Z_B', 'MASK', 'star_flag']
+        for key in table_keys:
+            if key not in cat.columns.names:
+                print 'WARNING: No key '+key+' in table of '+fname+'. Skipping calculation!'
+                return True
+
+
+        # Main loop: scan over the fields
+        for f in fields:
+
+            # Remove old output file to avoid confusion
+            try:
+                os.remove(path['m_'+f])
+            except:
+                pass
+
+            # Create a new WCS object
+            pars = set.image_pars[f]
+            w = wcs.WCS(naxis=pars['NAXIS'])
+            w.wcs.crpix = [pars['CRPIX1'], pars['CRPIX2']]
+            w.wcs.cdelt = [pars['CDELT1'], pars['CDELT1']]
+            w.wcs.crval = [pars['CRVAL1'], pars['CRVAL2']]
+            w.wcs.ctype = [pars['CTYPE1'], pars['CTYPE2']]
+            hd = w.to_header()
+
+            # Second loop to divide galaxies in redshift bins
+            for n_z_bin, z_bin in enumerate(z_bins):
+
+                print 'Calculating multiplicative correction for field ' + f + ' and bin {}:'.format(n_z_bin+1)
+                sys.stdout.flush()
+
+
+                # Create an empty array for the multiplicative correction
+                mult_corr = np.zeros((pars['NAXIS1'], pars['NAXIS1']))
+
+                # Filter galaxies
+                filter = set.filter_galaxies(cat, z_bin[0], z_bin[1], field=f)
+                gals = cat[filter]
+
+                # Get World position of each galaxy
+                pos = zip(gals['ALPHA_J2000'],gals['DELTA_J2000'])
+                # Calculate Pixel position of each galaxy
+                pos = w.wcs_world2pix(pos, 1).astype(int)
+                pos = np.flip(pos,axis=1) #Need to invert the columns
+                # Pixels where at least one galaxy has been found
+                pos_unique = np.unique(pos, axis=0)
+                # Scan over the populated pixels
+                for count, pix in enumerate(pos_unique):
+                    # Calculate range of pixels to average
+                    if pix[0]-n_avg_m<0:
+                        s1 = 0
+                    elif pix[0]+n_avg_m>=mult_corr.shape[0]:
+                        s1 = mult_corr.shape[0]-(2*n_avg_m+1)
+                    else:
+                        s1 = pix[0]-n_avg_m
+                    if pix[1]-n_avg_m<0:
+                        s2 = 0
+                    elif pix[1]+n_avg_m>=mult_corr.shape[1]:
+                        s2 = mult_corr.shape[1]-(2*n_avg_m+1)
+                    else:
+                        s2 = pix[1]-n_avg_m
+                    # Select galaxies in range of pixels
+                    sel = pos[:,0] >= s1
+                    sel = (pos[:,0] < s1+2*n_avg_m+1)*sel
+                    sel = (pos[:,1] >= s2)*sel
+                    sel = (pos[:,1] < s2+2*n_avg_m+1)*sel
+                    m = gals[sel]['m']
+                    weight = gals[sel]['weight']
+                    mult_corr[tuple(pix)] = np.average(m, weights=weight)
+
+                    # Print message every some step
+                    if (count+1) % 1e3 == 0:
+                        print '----> Done {0:5.1%} of the pixels ({1:d})'.format(float(count+1) /len(pos_unique), len(pos_unique))
+                        sys.stdout.flush()
+
+                # Save to file the map
+                name = 'MULT_CORR_{}_Z{}'.format(f, n_z_bin+1)
+                warning = io.write_to_fits(path['m_'+f], mult_corr, name, type='image')
+
+            io.print_info_fits(path['m_'+f])
+
         return warning
 
 
@@ -380,7 +478,11 @@ def prep_fourier(args):
 # ------------------- Function to calculate the multiplicative correction -----#
 
     def run_pz(path=path, z_bins=z_bins):
+
+        print 'Running PHOTO_Z module'
+        sys.stdout.flush()
         warning = False
+
         return warning
 
 
@@ -388,7 +490,11 @@ def prep_fourier(args):
 # ------------------- Function to calculate the map ---------------------------#
 
     def run_map(path=path, fields=fields, z_bins=z_bins):
+
+        print 'Running MAP module'
+        sys.stdout.flush()
         warning = False
+
         return warning
 
 

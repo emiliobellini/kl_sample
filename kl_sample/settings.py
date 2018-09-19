@@ -102,8 +102,8 @@ image_pars = {
         'CRPIX2'  : 140,
         'CRVAL1'  : 35.,
         'CRVAL2'  : -7.5,
-        'CDELT1'   : -2./60.,
-        'CDELT2'   : 2./60.,
+        'CDELT1'  : -2./60., # 2 arcmins in degrees
+        'CDELT2'  : 2./60., # 2 arcmins in degrees
         'CTYPE1'  : 'RA---TAN',
         'CTYPE2'  : 'DEC--TAN'
     },
@@ -115,8 +115,8 @@ image_pars = {
         'CRPIX2'  : 80.,
         'CRVAL1'  : 134.5,
         'CRVAL2'  : -3.3,
-        'CDELT1'   : -2./60.,
-        'CDELT2'   : 2./60.,
+        'CDELT1'  : -2./60., # 2 arcmins in degrees
+        'CDELT2'  : 2./60., # 2 arcmins in degrees
         'CTYPE1'  : 'RA---TAN',
         'CTYPE2'  : 'DEC--TAN'
     },
@@ -128,8 +128,8 @@ image_pars = {
         'CRPIX2'  : 120.,
         'CRVAL1'  : 214.5,
         'CRVAL2'  : 54.5,
-        'CDELT1'   : -2./60.,
-        'CDELT2'   : 2./60.,
+        'CDELT1'  : -2./60., # 2 arcmins in degrees
+        'CDELT2'  : 2./60., # 2 arcmins in degrees
         'CTYPE1'  : 'RA---TAN',
         'CTYPE2'  : 'DEC--TAN'
     },
@@ -141,8 +141,8 @@ image_pars = {
         'CRPIX2'  : 100.,
         'CRVAL1'  : 333.,
         'CRVAL2'  : 1.8,
-        'CDELT1'   : -2./60.,
-        'CDELT2'   : 2./60.,
+        'CDELT1'  : -2./60., # 2 arcmins in degrees
+        'CDELT2'  : 2./60., # 2 arcmins in degrees
         'CTYPE1'  : 'RA---TAN',
         'CTYPE2'  : 'DEC--TAN'
     }

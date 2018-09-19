@@ -467,7 +467,7 @@ def prep_fourier(args):
 
                 # Save to file the map
                 name = 'MULT_CORR_{}_Z{}'.format(f, n_z_bin+1)
-                warning = io.write_to_fits(path['m_'+f], mult_corr, name, type='image')
+                warning = io.write_to_fits(path['m_'+f], mult_corr, name, header=hd, type='image')
 
             io.print_info_fits(path['m_'+f])
 

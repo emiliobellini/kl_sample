@@ -50,6 +50,7 @@ def prep_fourier(args):
     io.path_exists_or_error(path['base'])
     path['cat_full'] = path['base']+'/'+path['fname']+'full_cat.fits'
     path['mask_url'] = path['base']+'/mask_url.txt'
+    path['photo_z'] = path['base']+'/photo_z.fits'
     for f in fields:
         path['cat_'+f] = path['base']+'/'+path['fname']+'cat_'+f+'.fits'
         path['map_'+f] = path['base']+'/'+path['fname']+'map_'+f+'.fits'
@@ -67,6 +68,9 @@ def prep_fourier(args):
     is_run_mult = np.array([not(os.path.exists(path['m_'+f])) for f in fields]).any()
     if args.run_mult:
         is_run_mult = True
+    is_run_pz = not(os.path.exists(path['photo_z']))
+    if args.run_pz:
+        is_run_pz = True
     is_run_map = np.array([not(os.path.exists(path['map_'+f])) for f in fields]).any()
     if args.run_map:
         is_run_map = True
@@ -95,12 +99,23 @@ def prep_fourier(args):
     if is_run_mult:
         nofile1 = np.array([not(os.path.exists(path['cat_'+f])) for f in fields]).any()
         if not(is_run_cat) and nofile1:
-            print 'WARNING: I will skip module to calculate the multiplicative correction. Input files not found!'
+            print 'WARNING: I will skip module to calculate the multiplicative correction. Input file not found!'
             sys.stdout.flush()
             is_run_mult = False
             warning = True
     else:
         print 'I will skip module to calculate the multiplicative correction. Output files already there!'
+        sys.stdout.flush()
+    if is_run_pz:
+        nofile1 = not(os.path.exists(path['cat_full']))
+        nofile2 = np.array([not(os.path.exists(path['m_'+f])) for f in fields]).any()
+        if nofile1 or (not(is_run_mult) and nofile2):
+            print 'WARNING: I will skip module to calculate the photo_z. Input files not found!'
+            sys.stdout.flush()
+            is_run_pz = False
+            warning = True
+    else:
+        print 'I will skip module to calculate the photo_z. Output file already there!'
         sys.stdout.flush()
     if is_run_map:
         nofile1 = np.array([not(os.path.exists(path['cat_'+f])) for f in fields]).any()
@@ -307,6 +322,12 @@ def prep_fourier(args):
         # Main loop: scan over the fields and generate new maps
         for f in fields:
 
+            # Remove old output file to avoid confusion
+            try:
+                os.remove(path['cat_'+f])
+            except:
+                pass
+
             # Second loop to divide galaxies in redshift bins
             for n_z_bin, z_bin in enumerate(z_bins):
 
@@ -343,6 +364,14 @@ def prep_fourier(args):
 
 
 
+# ------------------- Function to calculate the multiplicative correction -----#
+
+    def run_pz(path=path, z_bins=z_bins):
+        warning = False
+        return warning
+
+
+
 # ------------------- Function to calculate the map ---------------------------#
 
     def run_map(path=path, fields=fields, z_bins=z_bins):
@@ -374,6 +403,13 @@ def prep_fourier(args):
         hours, rem = divmod(end-start, 3600)
         minutes, seconds = divmod(rem, 60)
         print 'Run multiplicative correction module in {:0>2} Hours {:0>2} Minutes {:05.2f} Seconds!'.format(int(hours),int(minutes),seconds)
+    if is_run_pz:
+        start = time.clock()
+        warning = run_pz() or warning
+        end = time.clock()
+        hours, rem = divmod(end-start, 3600)
+        minutes, seconds = divmod(rem, 60)
+        print 'Run photo_z module in {:0>2} Hours {:0>2} Minutes {:05.2f} Seconds!'.format(int(hours),int(minutes),seconds)
     if is_run_map:
         start = time.clock()
         warning = run_map() or warning

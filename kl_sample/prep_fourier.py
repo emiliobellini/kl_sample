@@ -41,6 +41,19 @@ def prep_fourier(args):
 
 
 
+# ------------------- Useful functions ----------------------------------------#
+
+    def timing(fun, name):
+        warning = False
+        start = time.clock()
+        warning = fun
+        end = time.clock()
+        hours, rem = divmod(end-start, 3600)
+        minutes, seconds = divmod(rem, 60)
+        print 'Run {} module in {:0>2} Hours {:0>2} Minutes {:05.2f} Seconds!'.format(name,int(hours),int(minutes),seconds)
+        return warning
+
+
 
 # ------------------- Initialize paths ----------------------------------------#
 
@@ -79,54 +92,54 @@ def prep_fourier(args):
     if is_run_mask:
         nofile1 = not(os.path.exists(path['mask_url']))
         if nofile1:
-            print 'WARNING: I will skip module to calculate the masks. Input files not found!'
+            print 'WARNING: I will skip the MASK module. Input files not found!'
             sys.stdout.flush()
             is_run_mask = False
             warning = True
     else:
-        print 'I will skip module to calculate the masks. Output files already there!'
+        print 'I will skip the MASK module. Output files already there!'
         sys.stdout.flush()
     if is_run_cat:
         nofile1 = not(os.path.exists(path['cat_full']))
         if nofile1:
-            print 'WARNING: I will skip module to calculate the clean catalogues. Input file not found!'
+            print 'WARNING: I will skip the CATALOGUE module. Input file not found!'
             sys.stdout.flush()
             is_run_cat = False
             warning = True
     else:
-        print 'I will skip module to calculate the clean catalogues. Output files already there!'
+        print 'I will skip the CATALOGUE module. Output files already there!'
         sys.stdout.flush()
     if is_run_mult:
         nofile1 = np.array([not(os.path.exists(path['cat_'+f])) for f in fields]).any()
         if not(is_run_cat) and nofile1:
-            print 'WARNING: I will skip module to calculate the multiplicative correction. Input file not found!'
+            print 'WARNING: I will skip the MULT_CORR module. Input file not found!'
             sys.stdout.flush()
             is_run_mult = False
             warning = True
     else:
-        print 'I will skip module to calculate the multiplicative correction. Output files already there!'
+        print 'I will skip the MULT_CORR module. Output files already there!'
         sys.stdout.flush()
     if is_run_pz:
         nofile1 = not(os.path.exists(path['cat_full']))
         nofile2 = np.array([not(os.path.exists(path['m_'+f])) for f in fields]).any()
         if nofile1 or (not(is_run_mult) and nofile2):
-            print 'WARNING: I will skip module to calculate the photo_z. Input files not found!'
+            print 'WARNING: I will skip the PHOTO_Z module. Input files not found!'
             sys.stdout.flush()
             is_run_pz = False
             warning = True
     else:
-        print 'I will skip module to calculate the photo_z. Output file already there!'
+        print 'I will skip the PHOTO_Z module. Output file already there!'
         sys.stdout.flush()
     if is_run_map:
         nofile1 = np.array([not(os.path.exists(path['cat_'+f])) for f in fields]).any()
         nofile2 = np.array([not(os.path.exists(path['m_'+f])) for f in fields]).any()
         if (not(is_run_cat) and nofile1) or (not(is_run_mult) and nofile2):
-            print 'WARNING: I will skip module to calculate the map. Input files not found!'
+            print 'WARNING: I will skip the MAP module. Input files not found!'
             sys.stdout.flush()
             is_run_map = False
             warning = True
     else:
-        print 'I will skip module to calculate the map. Output files already there!'
+        print 'I will skip the MAP module. Output files already there!'
         sys.stdout.flush()
 
 
@@ -135,7 +148,7 @@ def prep_fourier(args):
 
     def run_mask(path=path, fields=fields, z_bins=z_bins):
 
-        print 'Running mask module'
+        print 'Running MASK module'
         sys.stdout.flush()
         warning = False
 
@@ -297,7 +310,7 @@ def prep_fourier(args):
 
     def run_cat(path=path, fields=fields, z_bins=z_bins):
 
-        print 'Running clean catalogue module'
+        print 'Running CATALOGUE module'
         sys.stdout.flush()
         warning = False
 
@@ -383,40 +396,15 @@ def prep_fourier(args):
 # ------------------- Pipeline ------------------------------------------------#
 
     if is_run_mask:
-        start = time.clock()
-        warning = run_mask() or warning
-        end = time.clock()
-        hours, rem = divmod(end-start, 3600)
-        minutes, seconds = divmod(rem, 60)
-        print 'Run mask module in {:0>2} Hours {:0>2} Minutes {:05.2f} Seconds!'.format(int(hours),int(minutes),seconds)
+        warning = timing(run_mask(), 'MASK') or warning
     if is_run_cat:
-        start = time.clock()
-        warning = run_cat() or warning
-        end = time.clock()
-        hours, rem = divmod(end-start, 3600)
-        minutes, seconds = divmod(rem, 60)
-        print 'Run catalogue module in {:0>2} Hours {:0>2} Minutes {:05.2f} Seconds!'.format(int(hours),int(minutes),seconds)
+        warning = timing(run_cat(), 'CATALOGUE') or warning
     if is_run_mult:
-        start = time.clock()
-        warning = run_mult() or warning
-        end = time.clock()
-        hours, rem = divmod(end-start, 3600)
-        minutes, seconds = divmod(rem, 60)
-        print 'Run multiplicative correction module in {:0>2} Hours {:0>2} Minutes {:05.2f} Seconds!'.format(int(hours),int(minutes),seconds)
+        warning = timing(run_mult(), 'MULT_CORR') or warning
     if is_run_pz:
-        start = time.clock()
-        warning = run_pz() or warning
-        end = time.clock()
-        hours, rem = divmod(end-start, 3600)
-        minutes, seconds = divmod(rem, 60)
-        print 'Run photo_z module in {:0>2} Hours {:0>2} Minutes {:05.2f} Seconds!'.format(int(hours),int(minutes),seconds)
+        warning = timing(run_pz(), 'PHOTO_Z') or warning
     if is_run_map:
-        start = time.clock()
-        warning = run_map() or warning
-        end = time.clock()
-        hours, rem = divmod(end-start, 3600)
-        minutes, seconds = divmod(rem, 60)
-        print 'Run map module in {:0>2} Hours {:0>2} Minutes {:05.2f} Seconds!'.format(int(hours),int(minutes),seconds)
+        warning = timing(run_map(), 'MAP') or warning
 
     if warning:
         print 'Done! However something went unexpectedly!! Check your warnings!'

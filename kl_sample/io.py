@@ -80,6 +80,8 @@ def argument_parser():
         'even if the files are already present', action='store_true')
     prep_fourier_parser.add_argument('--want_plots', '-p', help='Generate plots for the images',
         action='store_true')
+    prep_fourier_parser.add_argument('--keep_files', '-kp', help='Keep downloaded files',
+        action='store_true')
     #Arguments for 'get_kl'
     get_kl_parser.add_argument('params_file', type=str, help='Parameters file')
 
@@ -237,7 +239,7 @@ def read_cosmo_array(fname, pars):
 
 # ------------------- FITS files ----------------------------------------------#
 
-def read_from_fits(fname, name):
+def read_from_fits(fname, name, dtype=float):
     """ Open a fits file and read data from it.
 
     Args:
@@ -249,7 +251,7 @@ def read_from_fits(fname, name):
 
     """
     with fits.open(fname) as fn:
-        return fn[name].data
+        return fn[name].data.astype(dtype)
 
 
 def read_header_from_fits(fname, name):

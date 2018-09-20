@@ -177,9 +177,10 @@ def prep_fourier(args):
             imname = 'primary'
             fname = path['mask_sec_'+f]
             try:
-                mask_sec = io.read_from_fits(fname, imname)
+                mask_sec = io.read_from_fits(fname, imname, dtype=np.uint16)
             except KeyError:
                 print 'WARNING: No key '+imname+' in '+fname+'. Skipping calculation!'
+                sys.stdout.flush()
                 return True
             # Read mask header and check necessary keys
             try:
@@ -188,14 +189,16 @@ def prep_fourier(args):
                 w_sec = wcs.WCS(hd_sec)
             except KeyError:
                 print 'WARNING: No header in '+fname+'. Skipping calculation!'
+                sys.stdout.flush()
                 return True
             for key in ['CRPIX1','CRPIX2','CD1_1','CD2_2','CRVAL1','CRVAL2','CTYPE1','CTYPE2']:
                 if key not in list(hd_sec.keys()):
                     print 'WARNING: No key '+key+' in '+fname+'. Skipping calculation!'
+                    sys.stdout.flush()
                     return True
 
             # Convert mask to boolean
-            mask_sec = (1-np.array(mask_sec, dtype=bool)).astype(bool)
+            mask_sec = (1-np.array(mask_sec, dtype=bool)).astype(np.int8)
 
 
             # Remove bad fields from mask_sec
@@ -206,45 +209,28 @@ def prep_fourier(args):
                 if not(os.path.exists(badname)):
                     urllib.urlretrieve(url, badname)
                 # Read the mask
-                mask_bad = io.read_from_fits(badname, imname)
+                mask_bad = io.read_from_fits(badname, imname, dtype=np.int16)
                 hd_bad = io.read_header_from_fits(badname, imname)
                 w_bad = wcs.WCS(hd_bad)
                 # Find pixels inside the field
-                pos_bad = np.stack(np.where(mask_bad<8192), axis=-1)
-                for p in pos_bad:
-                    pix = w_bad.wcs_pix2world([p], 1)
-                    pix = w_sec.wcs_world2pix(pix, 1).astype(int)
-                    pix = np.flip(pix,axis=1) #Need to invert the columns
-                    # Set to zero pixels inside the field
-                    mask_sec[tuple(pix[0])] = 0.
+                n_arrs = 7
+                div = np.divide(mask_bad.shape[0],n_arrs)
+                starts = np.array([x*div for x in range(n_arrs) if x*div<mask_bad.shape[0]],dtype=np.int32)
+                ends = [s+div for s in starts]
+                ends[-1] = mask_bad.shape[0]
+                for start, end in zip(starts, ends):
+                    pos_bad = (start,0)+np.stack(np.where(mask_bad[start:end]<8192), axis=-1).astype(np.int32)
+                    pos_bad = w_bad.wcs_pix2world(pos_bad, 1).astype(np.float32)
+                    pos_bad = w_sec.wcs_world2pix(pos_bad, 1).astype(np.int32)
+                    pos_bad = np.flip(pos_bad,axis=1) #Need to invert the columns
+                    pos_bad = np.unique(pos_bad, axis=0)
+                    mask_sec[pos_bad[:,0], pos_bad[:,1]] = 0
+                # Print message
+                print '----> Removed bad field '+os.path.split(url)[1]+' from '+f+' mask!'
+                sys.stdout.flush()
                 # Remove file to save space
-                # os.remove(badname) TODO:uncomment this
-
-
-
-                # # Find borders of the mask
-                # mask_bad = (mask_bad-8192).astype(bool).astype(int)
-                # sh1 = mask_bad.shape[0]+2
-                # sh2 = mask_bad.shape[1]+2
-                # mask_bad_ext = np.zeros((sh1, sh2), dtype=int)
-                # mask_bad_ext_old = np.zeros((sh1, sh2), dtype=int)
-                # mask_bad_ext[1:sh1-1, 1:sh2-1] = mask_bad
-                # mask_bad_ext_old[1:sh1-1, 1:sh2-1] = mask_bad
-                # mask_bad_ext[0:-2,0:-2] += mask_bad
-                # mask_bad_ext[0:-2,1:-1] += mask_bad
-                # mask_bad_ext[0:-2,2:  ] += mask_bad
-                # mask_bad_ext[1:-1,0:-2] += mask_bad
-                # mask_bad_ext[1:-1,2:  ] += mask_bad
-                # mask_bad_ext[2:  ,0:-2] += mask_bad
-                # mask_bad_ext[2:  ,1:-1] += mask_bad
-                # mask_bad_ext[2:  ,2:  ] += mask_bad
-                # mask_bad_ext[mask_bad_ext > 8] = 0
-                # bord = np.where(mask_bad_ext_old*mask_bad_ext>0)
-                # print bord
-                # b2, b1 = np.where(mask_bad_ext_old*mask_bad_ext>0)
-                # b1 += -1
-                # b2 += -1
-
+                if not(args.keep_files):
+                    os.remove(badname)
 
 
             # Determine how many pixels should be grouped together in the degraded mask
@@ -253,6 +239,7 @@ def prep_fourier(args):
             cond2 = abs(dim_ratio/abs(size_pix/(hd_sec['CD2_2']*60.**2))-1)>1e-6
             if cond1 or cond2:
                 print 'WARNING: Invalid pixel dimensions. Skipping calculation!'
+                sys.stdout.flush()
                 return True
 
             # Calculate how many pixels should be added to the original mask
@@ -272,7 +259,7 @@ def prep_fourier(args):
             end2 = start2+mask_sec.shape[1]
 
             # Add borders to the mask
-            mask_ext = np.zeros((x1*dim_ratio, x2*dim_ratio), dtype=bool)
+            mask_ext = np.zeros((x1*dim_ratio, x2*dim_ratio), dtype=np.int8)
             mask_ext[start1:end1,start2:end2] = mask_sec
 
             # Calculate new mask
@@ -326,6 +313,7 @@ def prep_fourier(args):
             cat = io.read_from_fits(fname, table_name)
         except KeyError:
             print 'WARNING: No key '+table_name+' in '+fname+'. Skipping calculation!'
+            sys.stdout.flush()
             return True
 
         # Check that the table has the correct columns
@@ -333,6 +321,7 @@ def prep_fourier(args):
         for key in table_keys:
             if key not in cat.columns.names:
                 print 'WARNING: No key '+key+' in table of '+fname+'. Skipping calculation!'
+                sys.stdout.flush()
                 return True
 
 
@@ -389,6 +378,7 @@ def prep_fourier(args):
             cat = io.read_from_fits(fname, table_name)
         except KeyError:
             print 'WARNING: No key '+table_name+' in '+fname+'. Skipping calculation!'
+            sys.stdout.flush()
             return True
 
         # Check that the table has the correct columns
@@ -396,6 +386,7 @@ def prep_fourier(args):
         for key in table_keys:
             if key not in cat.columns.names:
                 print 'WARNING: No key '+key+' in table of '+fname+'. Skipping calculation!'
+                sys.stdout.flush()
                 return True
 
 
@@ -511,13 +502,15 @@ def prep_fourier(args):
         hrs, rem = divmod(end-start, 3600)
         mins, secs = divmod(rem, 60)
         print 'Run MASK module in {:0>2} Hours {:0>2} Minutes {:05.2f} Seconds!'.format(int(hrs),int(mins),secs)
-    # if is_run_cat:
-    #     start = time.clock()
-    #     warning = run_cat() or warning
-    #     end = time.clock()
-    #     hrs, rem = divmod(end-start, 3600)
-    #     mins, secs = divmod(rem, 60)
-    #     print 'Run CATALOGUE module in {:0>2} Hours {:0>2} Minutes {:05.2f} Seconds!'.format(int(hrs),int(mins),secs)
+        sys.stdout.flush()
+    if is_run_cat:
+        start = time.clock()
+        warning = run_cat() or warning
+        end = time.clock()
+        hrs, rem = divmod(end-start, 3600)
+        mins, secs = divmod(rem, 60)
+        print 'Run CATALOGUE module in {:0>2} Hours {:0>2} Minutes {:05.2f} Seconds!'.format(int(hrs),int(mins),secs)
+        sys.stdout.flush()
     # if is_run_mult:
     #     start = time.clock()
     #     warning = run_mult() or warning
@@ -525,6 +518,7 @@ def prep_fourier(args):
     #     hrs, rem = divmod(end-start, 3600)
     #     mins, secs = divmod(rem, 60)
     #     print 'Run MULT_CORR module in {:0>2} Hours {:0>2} Minutes {:05.2f} Seconds!'.format(int(hrs),int(mins),secs)
+    #     sys.stdout.flush()
     # if is_run_pz:
     #     start = time.clock()
     #     warning = run_pz() or warning
@@ -532,6 +526,7 @@ def prep_fourier(args):
     #     hrs, rem = divmod(end-start, 3600)
     #     mins, secs = divmod(rem, 60)
     #     print 'Run PHOTO_Z module in {:0>2} Hours {:0>2} Minutes {:05.2f} Seconds!'.format(int(hrs),int(mins),secs)
+    #     sys.stdout.flush()
     # if is_run_map:
     #     start = time.clock()
     #     warning = run_map() or warning
@@ -539,11 +534,14 @@ def prep_fourier(args):
     #     hrs, rem = divmod(end-start, 3600)
     #     mins, secs = divmod(rem, 60)
     #     print 'Run MAP module in {:0>2} Hours {:0>2} Minutes {:05.2f} Seconds!'.format(int(hrs),int(mins),secs)
+    #     sys.stdout.flush()
 
     if warning:
         print 'Done! However something went unexpectedly!! Check your warnings!'
+        sys.stdout.flush()
     else:
         print 'Success!!'
+        sys.stdout.flush()
 
 
 

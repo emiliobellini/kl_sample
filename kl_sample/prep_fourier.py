@@ -406,80 +406,92 @@ def prep_fourier(args):
                 return True
 
 
-        # # Main loop: scan over the fields
-        # for f in fields:
-        #
-        #     # Remove old output file to avoid confusion
-        #     try:
-        #         os.remove(path['m_'+f])
-        #     except:
-        #         pass
-        #
-        #     # Create a new WCS object
-        #     pars = set.image_pars[f]
-        #     w = wcs.WCS(naxis=pars['NAXIS'])
-        #     w.wcs.crpix = [pars['CRPIX1'], pars['CRPIX2']]
-        #     w.wcs.cdelt = [pars['CDELT1'], pars['CDELT1']]
-        #     w.wcs.crval = [pars['CRVAL1'], pars['CRVAL2']]
-        #     w.wcs.ctype = [pars['CTYPE1'], pars['CTYPE2']]
-        #     hd = w.to_header()
-        #
-        #     # Second loop to divide galaxies in redshift bins
-        #     for n_z_bin, z_bin in enumerate(z_bins):
-        #
-        #         print 'Calculating multiplicative correction for field ' + f + ' and bin {}:'.format(n_z_bin+1)
-        #         sys.stdout.flush()
-        #
-        #
-        #         # Create an empty array for the multiplicative correction
-        #         mult_corr = np.zeros((pars['NAXIS1'], pars['NAXIS1']))
-        #
-        #         # Filter galaxies
-        #         filter = set.filter_galaxies(cat, z_bin[0], z_bin[1], field=f)
-        #         gals = cat[filter]
-        #
-        #         # Get World position of each galaxy
-        #         pos = zip(gals['ALPHA_J2000'],gals['DELTA_J2000'])
-        #         # Calculate Pixel position of each galaxy
-        #         pos = w.wcs_world2pix(pos, 1).astype(int)
-        #         pos = np.flip(pos,axis=1) #Need to invert the columns
-        #         # Pixels where at least one galaxy has been found
-        #         pos_unique = np.unique(pos, axis=0)
-        #         print pos_unique
-        #         # Scan over the populated pixels
-        #         for count, pix in enumerate(pos_unique):
-        #             # Calculate range of pixels to average
-        #             if pix[0]-n_avg_m<0:
-        #                 s1 = 0
-        #             elif pix[0]+n_avg_m>=mult_corr.shape[0]:
-        #                 s1 = mult_corr.shape[0]-(2*n_avg_m+1)
-        #             else:
-        #                 s1 = pix[0]-n_avg_m
-        #             if pix[1]-n_avg_m<0:
-        #                 s2 = 0
-        #             elif pix[1]+n_avg_m>=mult_corr.shape[1]:
-        #                 s2 = mult_corr.shape[1]-(2*n_avg_m+1)
-        #             else:
-        #                 s2 = pix[1]-n_avg_m
-        #             # Select galaxies in range of pixels
-        #             sel = pos[:,0] >= s1
-        #             sel = (pos[:,0] < s1+2*n_avg_m+1)*sel
-        #             sel = (pos[:,1] >= s2)*sel
-        #             sel = (pos[:,1] < s2+2*n_avg_m+1)*sel
-        #             m = gals[sel]['m']
-        #             weight = gals[sel]['weight']
-        #             mult_corr[tuple(pix)] = np.average(m, weights=weight)
-        #
-        #             # Print message every some step
-        #             if (count+1) % 1e3 == 0:
-        #                 print '----> Done {0:5.1%} of the pixels ({1:d})'.format(float(count+1) /len(pos_unique), len(pos_unique))
-        #                 sys.stdout.flush()
-        #
-        #         # Save to file the map
-        #         name = 'MULT_CORR_{}_Z{}'.format(f, n_z_bin+1)
-        #         warning = io.write_to_fits(path['m_'+f], mult_corr, name, header=hd, type='image') or warning
-        #
-        #     io.print_info_fits(path['m_'+f])
+        # Main loop: scan over the fields
+        for f in fields:
+
+            # Remove old output file to avoid confusion
+            try:
+                os.remove(path['m_'+f])
+            except:
+                pass
+
+            # Read mask and create WCS object
+            imname = 'MASK_{}'.format(f)
+            fname = path['mask_'+f]
+            try:
+                mask = io.read_from_fits(fname, imname)
+                hd = io.read_header_from_fits(fname, imname)
+            except KeyError:
+                print 'WARNING: No key '+imname+' in '+fname+'. Skipping calculation!'
+                sys.stdout.flush()
+                return True
+
+            # Create a new WCS object
+            w = wcs.WCS(hd)
+
+            # Second loop to divide galaxies in redshift bins
+            for n_z_bin, z_bin in enumerate(z_bins):
+
+                print 'Calculating multiplicative correction for field ' + f + ' and bin {}:'.format(n_z_bin+1)
+                sys.stdout.flush()
+
+
+                # Create an empty array for the multiplicative correction
+                mult_corr = np.zeros(mask.shape)
+
+                # Filter galaxies
+                filter = set.filter_galaxies(cat, z_bin[0], z_bin[1], field=f)
+                gals = cat[filter]
+
+                # Get World position of each galaxy
+                pos = zip(gals['ALPHA_J2000'],gals['DELTA_J2000'])
+                # Calculate Pixel position of each galaxy
+                pos = w.wcs_world2pix(pos, 1).astype(int)
+                pos = np.flip(pos,axis=1) #Need to invert the columns
+                # Pixels where at least one galaxy has been found
+                pos_unique = np.unique(pos, axis=0)
+                # Scan over the populated pixels
+                for count, pix in enumerate(pos_unique):
+                    # Calculate range of pixels to average
+                    if pix[0]-n_avg_m<0:
+                        s1 = 0
+                    elif pix[0]+n_avg_m>=mult_corr.shape[0]:
+                        s1 = mult_corr.shape[0]-(2*n_avg_m+1)
+                    else:
+                        s1 = pix[0]-n_avg_m
+                    if pix[1]-n_avg_m<0:
+                        s2 = 0
+                    elif pix[1]+n_avg_m>=mult_corr.shape[1]:
+                        s2 = mult_corr.shape[1]-(2*n_avg_m+1)
+                    else:
+                        s2 = pix[1]-n_avg_m
+                    # Select galaxies in range of pixels
+                    sel = pos[:,0] >= s1
+                    sel = (pos[:,0] < s1+2*n_avg_m+1)*sel
+                    sel = (pos[:,1] >= s2)*sel
+                    sel = (pos[:,1] < s2+2*n_avg_m+1)*sel
+                    m = gals[sel]['m']
+                    weight = gals[sel]['weight']
+                    mult_corr[tuple(pix)] = np.average(m, weights=weight)
+
+                    # Print message every some step
+                    if (count+1) % 1e3 == 0:
+                        print '----> Done {0:5.1%} of the pixels ({1:d})'.format(float(count+1) /len(pos_unique), len(pos_unique))
+                        sys.stdout.flush()
+
+                # Save to file the map
+                name = 'MULT_CORR_{}_Z{}'.format(f, n_z_bin+1)
+                warning = io.write_to_fits(path['m_'+f], mult_corr, name, header=hd, type='image') or warning
+
+                # Generate plots
+                if args.want_plots:
+                    plt.imshow(mult_corr,interpolation='nearest')
+                    plt.colorbar()
+                    plt.savefig(path['base']+'/mult_corr_{}_z{}.pdf'.format(f, n_z_bin+1))
+                    plt.close()
+
+            io.print_info_fits(path['m_'+f])
+
 
         return warning
 
@@ -513,7 +525,7 @@ def prep_fourier(args):
 
     if is_run_mask:
         start = time.clock()
-        warning = run_mask(fields=['W3']) or warning
+        warning = run_mask() or warning
         end = time.clock()
         hrs, rem = divmod(end-start, 3600)
         mins, secs = divmod(rem, 60)
@@ -527,14 +539,14 @@ def prep_fourier(args):
         mins, secs = divmod(rem, 60)
         print 'Run CATALOGUE module in {:0>2} Hours {:0>2} Minutes {:05.2f} Seconds!'.format(int(hrs),int(mins),secs)
         sys.stdout.flush()
-    # if is_run_mult:
-    #     start = time.clock()
-    #     warning = run_mult() or warning
-    #     end = time.clock()
-    #     hrs, rem = divmod(end-start, 3600)
-    #     mins, secs = divmod(rem, 60)
-    #     print 'Run MULT_CORR module in {:0>2} Hours {:0>2} Minutes {:05.2f} Seconds!'.format(int(hrs),int(mins),secs)
-    #     sys.stdout.flush()
+    if is_run_mult:
+        start = time.clock()
+        warning = run_mult() or warning
+        end = time.clock()
+        hrs, rem = divmod(end-start, 3600)
+        mins, secs = divmod(rem, 60)
+        print 'Run MULT_CORR module in {:0>2} Hours {:0>2} Minutes {:05.2f} Seconds!'.format(int(hrs),int(mins),secs)
+        sys.stdout.flush()
     # if is_run_pz:
     #     start = time.clock()
     #     warning = run_pz() or warning

@@ -57,7 +57,7 @@ def prep_fourier(args):
     path = {}
     path['base'], path['fname'] = os.path.split(os.path.abspath(args.input_path))
     io.path_exists_or_error(path['base'])
-    path['cat_full'] = path['base']+'/'+path['fname']+'full_cat.fits.gz'
+    path['cat_full'] = path['base']+'/'+path['fname']+'full_cat.fits'
     path['mask_url'] = path['base']+'/mask_url.txt'
     path['photo_z'] = path['base']+'/photo_z.fits'
     for f in fields:
@@ -425,7 +425,6 @@ def prep_fourier(args):
                 print 'WARNING: No key '+imname+' in '+fname+'. Skipping calculation!'
                 sys.stdout.flush()
                 return True
-
             # Create a new WCS object
             w = wcs.WCS(hd)
 
@@ -505,6 +504,109 @@ def prep_fourier(args):
         sys.stdout.flush()
         warning = False
 
+        # Read galaxy catalogue
+        table_name = 'data'
+        imname = 'pz_full'
+        fname = path['cat_full']
+        try:
+            cat = io.read_from_fits(fname, table_name)
+        except KeyError:
+            print 'WARNING: No key '+table_name+' in '+fname+'. Skipping calculation!'
+            sys.stdout.flush()
+            return True
+        try:
+            pz_full = io.read_from_fits(fname, imname)
+        except KeyError:
+            print 'WARNING: No key '+imname+' in '+fname+'. Skipping calculation!'
+            sys.stdout.flush()
+            return True
+
+        # Check that the table has the correct columns
+        table_keys = ['ALPHA_J2000', 'DELTA_J2000', 'm', 'weight', 'id', 'Z_B', 'MASK', 'star_flag']
+        for key in table_keys:
+            if key not in cat.columns.names:
+                print 'WARNING: No key '+key+' in table of '+fname+'. Skipping calculation!'
+                sys.stdout.flush()
+                return True
+
+        # Read multiplicative corrections
+        m = {}
+        w = {}
+        for f in fields:
+            m[f] = {}
+            fname = path['m_'+f]
+            for n_z_bin, z_bin in enumerate(z_bins):
+                imname = 'MULT_CORR_{}_Z{}'.format(f, n_z_bin+1)
+                try:
+                    m[f][n_z_bin] = io.read_from_fits(fname, imname)
+                    hd = io.read_header_from_fits(fname, imname)
+                except KeyError:
+                    print 'WARNING: No key '+imname+' in '+fname+'. Skipping calculation!'
+                    sys.stdout.flush()
+                    return True
+            # Create a new WCS object
+            w[f] = wcs.WCS(hd)
+
+
+        # Initialize quantities
+        photo_z = np.zeros((len(z_bins)+1,len(pz_full[0])))
+        n_eff = np.zeros(len(z_bins))
+        sigma_g = np.zeros(len(z_bins))
+        photo_z[0] = (np.arange(len(pz_full[0]))+1./2.)*set.dZ_CFHTlens
+
+
+        # Main loop: for each bin calculate photo_z, n_eff and sigma_g
+        for n_z_bin, z_bin in enumerate(z_bins):
+            # Filter galaxies
+            filter = set.filter_galaxies(cat, z_bin[0], z_bin[1])
+            gals = cat[filter]
+            pz_z = pz_full[filter]
+
+            # Multiplicative correction
+            def find_correction(w, gal, n_z_bin):
+                pix = w[gal['id'][:2]].wcs_world2pix([[gal['ALPHA_J2000'],gal['DELTA_J2000']]],1)
+                pix = tuple(np.flip(pix.astype(int),axis=1)[0])
+                return m[gal['id'][:2]][n_z_bin][pix]
+            m_corr = np.array([find_correction(w, gal, n_z_bin) for gal in gals])
+            # Weights
+            w_sum = gals['weight'].sum()
+            w2_sum = (gals['weight']**2.).sum()
+            e1 = gals['e1']/(1+m_corr)
+            e2 = (gals['e2']-gals['c2'])/(1+m_corr)
+
+            # photo_z
+            photo_z[n_z_bin+1] = np.dot(gals['weight'], pz_z)/w_sum
+            # n_eff
+            n_eff[n_z_bin] = w_sum**2/w2_sum/set.A_CFHTlens.sum()
+            # sigma_g
+            sigma_g[n_z_bin] = np.dot(gals['weight']**2., (e1**2. + e2**2.)/2.)/w2_sum
+            sigma_g[n_z_bin] = sigma_g[n_z_bin]**0.5
+
+            # Print progress message
+            print '----> Completed bin {}'.format(n_z_bin+1)
+            sys.stdout.flush()
+
+        # Save to file the map
+        warning = io.write_to_fits(path['photo_z'], photo_z, 'PHOTO_Z', type='image') or warning
+        warning = io.write_to_fits(path['photo_z'], n_eff, 'n_eff', type='image') or warning
+        warning = io.write_to_fits(path['photo_z'], sigma_g, 'sigma_g', type='image') or warning
+
+        # Generate plots
+        if args.want_plots:
+            x = photo_z[0]
+            for count in range(1,len(photo_z)):
+                y = photo_p[count]
+                plt.plot(x, y, label = 'Bin ' + str(count+1))
+            plt.xlim(0.,2.)
+            plt.xlabel('$z$', fontsize=14)
+            plt.ylabel('Probability distribution', fontsize=14)
+            plt.legend(loc="upper right", frameon = False, fontsize=9, labelspacing=0.01)
+            plt.savefig(path['base']+'/photo_z.pdf')
+            plt.close()
+
+        io.print_info_fits(path['photo_z'])
+
+
         return warning
 
 
@@ -547,14 +649,14 @@ def prep_fourier(args):
         mins, secs = divmod(rem, 60)
         print 'Run MULT_CORR module in {:0>2} Hours {:0>2} Minutes {:05.2f} Seconds!'.format(int(hrs),int(mins),secs)
         sys.stdout.flush()
-    # if is_run_pz:
-    #     start = time.clock()
-    #     warning = run_pz() or warning
-    #     end = time.clock()
-    #     hrs, rem = divmod(end-start, 3600)
-    #     mins, secs = divmod(rem, 60)
-    #     print 'Run PHOTO_Z module in {:0>2} Hours {:0>2} Minutes {:05.2f} Seconds!'.format(int(hrs),int(mins),secs)
-    #     sys.stdout.flush()
+    if is_run_pz:
+        start = time.clock()
+        warning = run_pz() or warning
+        end = time.clock()
+        hrs, rem = divmod(end-start, 3600)
+        mins, secs = divmod(rem, 60)
+        print 'Run PHOTO_Z module in {:0>2} Hours {:0>2} Minutes {:05.2f} Seconds!'.format(int(hrs),int(mins),secs)
+        sys.stdout.flush()
     # if is_run_map:
     #     start = time.clock()
     #     warning = run_map() or warning

@@ -588,14 +588,14 @@ def prep_fourier(args):
 
         # Save to file the map
         warning = io.write_to_fits(path['photo_z'], photo_z, 'PHOTO_Z', type='image') or warning
-        warning = io.write_to_fits(path['photo_z'], n_eff, 'n_eff', type='image') or warning
-        warning = io.write_to_fits(path['photo_z'], sigma_g, 'sigma_g', type='image') or warning
+        warning = io.write_to_fits(path['photo_z'], n_eff, 'N_EFF', type='image') or warning
+        warning = io.write_to_fits(path['photo_z'], sigma_g, 'SIGMA_G', type='image') or warning
 
         # Generate plots
         if args.want_plots:
             x = photo_z[0]
             for count in range(1,len(photo_z)):
-                y = photo_p[count]
+                y = photo_z[count]
                 plt.plot(x, y, label = 'Bin ' + str(count+1))
             plt.xlim(0.,2.)
             plt.xlabel('$z$', fontsize=14)

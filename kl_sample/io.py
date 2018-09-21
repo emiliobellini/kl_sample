@@ -239,7 +239,7 @@ def read_cosmo_array(fname, pars):
 
 # ------------------- FITS files ----------------------------------------------#
 
-def read_from_fits(fname, name, dtype=float):
+def read_from_fits(fname, name):
     """ Open a fits file and read data from it.
 
     Args:
@@ -251,7 +251,7 @@ def read_from_fits(fname, name, dtype=float):
 
     """
     with fits.open(fname) as fn:
-        return fn[name].data.astype(dtype)
+        return fn[name].data
 
 
 def read_header_from_fits(fname, name):

@@ -57,7 +57,7 @@ def prep_fourier(args):
     path = {}
     path['base'], path['fname'] = os.path.split(os.path.abspath(args.input_path))
     io.path_exists_or_error(path['base'])
-    path['cat_full'] = path['base']+'/'+path['fname']+'full_cat.fits'
+    path['cat_full'] = path['base']+'/'+path['fname']+'full_cat.fits.gz'
     path['mask_url'] = path['base']+'/mask_url.txt'
     path['photo_z'] = path['base']+'/photo_z.fits'
     for f in fields:
@@ -179,7 +179,7 @@ def prep_fourier(args):
             imname = 'primary'
             fname = path['mask_sec_'+f]
             try:
-                mask_sec = io.read_from_fits(fname, imname, dtype=np.uint16)
+                mask_sec = io.read_from_fits(fname, imname).astype(np.uint16)
             except KeyError:
                 print 'WARNING: No key '+imname+' in '+fname+'. Skipping calculation!'
                 sys.stdout.flush()
@@ -265,10 +265,13 @@ def prep_fourier(args):
                         with gzip.open(badname+'.gz', 'wb') as f_out:
                             shutil.copyfileobj(f_in, f_out)
                 if os.path.exists(badname+'.gz'):
-                    os.remove(badname)
+                    try:
+                        os.remove(badname)
+                    except:
+                        pass
                     badname = badname + '.gz'
                 # Read the mask
-                mask_bad = io.read_from_fits(badname, imname, dtype=np.int16)
+                mask_bad = io.read_from_fits(badname, imname).astype(np.int16)
                 hd_bad = io.read_header_from_fits(badname, imname)
                 w_bad = wcs.WCS(hd_bad)
                 # Find pixels inside the field
@@ -280,7 +283,7 @@ def prep_fourier(args):
                 for start, end in zip(starts, ends):
                     pos_bad = (start,0)+np.stack(np.where(mask_bad[start:end]<8192), axis=-1).astype(np.int32)
                     pos_bad = w_bad.wcs_pix2world(pos_bad, 1).astype(np.float32)
-                    pos_bad = w.wcs_world2pix(pos_bad, 1).astype(np.int32)
+                    pos_bad = np.around(w.wcs_world2pix(pos_bad, 1)).astype(np.int32)
                     pos_bad = np.flip(pos_bad,axis=1) #Need to invert the columns
                     pos_bad = np.unique(pos_bad, axis=0)
                     mask[pos_bad[:,0], pos_bad[:,1]] = 0
@@ -510,7 +513,7 @@ def prep_fourier(args):
 
     if is_run_mask:
         start = time.clock()
-        warning = run_mask(fields=['W4']) or warning
+        warning = run_mask(fields=['W3']) or warning
         end = time.clock()
         hrs, rem = divmod(end-start, 3600)
         mins, secs = divmod(rem, 60)

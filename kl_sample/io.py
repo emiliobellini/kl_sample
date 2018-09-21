@@ -80,7 +80,7 @@ def argument_parser():
         'even if the files are already present', action='store_true')
     prep_fourier_parser.add_argument('--want_plots', '-p', help='Generate plots for the images',
         action='store_true')
-    prep_fourier_parser.add_argument('--keep_files', '-kp', help='Keep downloaded files',
+    prep_fourier_parser.add_argument('--remove_files', '-rp', help='Remove downloaded files',
         action='store_true')
     #Arguments for 'get_kl'
     get_kl_parser.add_argument('params_file', type=str, help='Parameters file')

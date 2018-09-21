@@ -12,6 +12,8 @@ import re
 import numpy as np
 import urllib
 import time
+import gzip
+import shutil
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
@@ -185,8 +187,6 @@ def prep_fourier(args):
             # Read mask header and check necessary keys
             try:
                 hd_sec = io.read_header_from_fits(fname, imname)
-                # Create a WCS object for mask_sec
-                w_sec = wcs.WCS(hd_sec)
             except KeyError:
                 print 'WARNING: No header in '+fname+'. Skipping calculation!'
                 sys.stdout.flush()
@@ -199,38 +199,6 @@ def prep_fourier(args):
 
             # Convert mask to boolean
             mask_sec = (1-np.array(mask_sec, dtype=bool)).astype(np.int8)
-
-
-            # Remove bad fields from mask_sec
-            imname = 'primary'
-            for url in urls:
-                badname = path['base']+'/'+os.path.split(url)[1]
-                # Get the file if it is not there
-                if not(os.path.exists(badname)):
-                    urllib.urlretrieve(url, badname)
-                # Read the mask
-                mask_bad = io.read_from_fits(badname, imname, dtype=np.int16)
-                hd_bad = io.read_header_from_fits(badname, imname)
-                w_bad = wcs.WCS(hd_bad)
-                # Find pixels inside the field
-                n_arrs = 7
-                div = np.divide(mask_bad.shape[0],n_arrs)
-                starts = np.array([x*div for x in range(n_arrs) if x*div<mask_bad.shape[0]],dtype=np.int32)
-                ends = [s+div for s in starts]
-                ends[-1] = mask_bad.shape[0]
-                for start, end in zip(starts, ends):
-                    pos_bad = (start,0)+np.stack(np.where(mask_bad[start:end]<8192), axis=-1).astype(np.int32)
-                    pos_bad = w_bad.wcs_pix2world(pos_bad, 1).astype(np.float32)
-                    pos_bad = w_sec.wcs_world2pix(pos_bad, 1).astype(np.int32)
-                    pos_bad = np.flip(pos_bad,axis=1) #Need to invert the columns
-                    pos_bad = np.unique(pos_bad, axis=0)
-                    mask_sec[pos_bad[:,0], pos_bad[:,1]] = 0
-                # Print message
-                print '----> Removed bad field '+os.path.split(url)[1]+' from '+f+' mask!'
-                sys.stdout.flush()
-                # Remove file to save space
-                if not(args.keep_files):
-                    os.remove(badname)
 
 
             # Determine how many pixels should be grouped together in the degraded mask
@@ -278,6 +246,51 @@ def prep_fourier(args):
             w.wcs.crval = np.array([hd_sec['CRVAL1'], hd_sec['CRVAL2']])
             w.wcs.ctype = [hd_sec['CTYPE1'], hd_sec['CTYPE2']]
             hd = w.to_header()
+
+            # Print message
+            print '----> Degraded mask for '+f+'. Now I will remove the bad fields!'
+            sys.stdout.flush()
+
+
+            # Remove bad fields from mask
+            imname = 'primary'
+            for url in urls:
+                badname = path['base']+'/'+os.path.split(url)[1]
+                # Get the file if it is not there
+                if not(os.path.exists(badname) or os.path.exists(badname+'.gz')):
+                    urllib.urlretrieve(url, badname)
+                # Compress file
+                if os.path.exists(badname):
+                    with open(badname, 'rb') as f_in:
+                        with gzip.open(badname+'.gz', 'wb') as f_out:
+                            shutil.copyfileobj(f_in, f_out)
+                if os.path.exists(badname+'.gz'):
+                    os.remove(badname)
+                    badname = badname + '.gz'
+                # Read the mask
+                mask_bad = io.read_from_fits(badname, imname, dtype=np.int16)
+                hd_bad = io.read_header_from_fits(badname, imname)
+                w_bad = wcs.WCS(hd_bad)
+                # Find pixels inside the field
+                n_arrs = 7
+                div = np.divide(mask_bad.shape[0],n_arrs)
+                starts = np.array([x*div for x in range(n_arrs) if x*div<mask_bad.shape[0]],dtype=np.int32)
+                ends = [s+div for s in starts]
+                ends[-1] = mask_bad.shape[0]
+                for start, end in zip(starts, ends):
+                    pos_bad = (start,0)+np.stack(np.where(mask_bad[start:end]<8192), axis=-1).astype(np.int32)
+                    pos_bad = w_bad.wcs_pix2world(pos_bad, 1).astype(np.float32)
+                    pos_bad = w.wcs_world2pix(pos_bad, 1).astype(np.int32)
+                    pos_bad = np.flip(pos_bad,axis=1) #Need to invert the columns
+                    pos_bad = np.unique(pos_bad, axis=0)
+                    mask[pos_bad[:,0], pos_bad[:,1]] = 0
+                # Print message
+                print '----> Removed bad field '+os.path.split(url)[1]+' from '+f+' mask!'
+                sys.stdout.flush()
+                # Remove file to save space
+                if args.remove_files:
+                    os.remove(badname)
+
 
             # Save to file the map
             name = 'MASK_{}'.format(f)
@@ -497,7 +510,7 @@ def prep_fourier(args):
 
     if is_run_mask:
         start = time.clock()
-        warning = run_mask() or warning
+        warning = run_mask(fields=['W4']) or warning
         end = time.clock()
         hrs, rem = divmod(end-start, 3600)
         mins, secs = divmod(rem, 60)

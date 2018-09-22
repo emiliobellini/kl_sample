@@ -89,7 +89,8 @@ def prep_fourier(args):
     if is_run_mask:
         nofile1 = not(os.path.exists(path['mask_url']))
         nofile2 = np.array([not(os.path.exists(path['mask_sec_'+f])) for f in fields]).any()
-        if nofile1 or nofile2:
+        nofile3 = not(os.path.exists(path['cat_full']))
+        if nofile1 or nofile2 or nofile3:
             print 'WARNING: I will skip the MASK module. Input files not found!'
             sys.stdout.flush()
             is_run_mask = False
@@ -151,6 +152,24 @@ def prep_fourier(args):
         print 'Running MASK module'
         sys.stdout.flush()
         warning = False
+
+        # Read galaxy catalogue
+        table_name = 'data'
+        fname = path['cat_full']
+        try:
+            cat = io.read_from_fits(fname, table_name)
+        except KeyError:
+            print 'WARNING: No key '+table_name+' in '+fname+'. Skipping calculation!'
+            sys.stdout.flush()
+            return True
+
+        # Check that the table has the correct columns
+        table_keys = ['ALPHA_J2000', 'DELTA_J2000', 'id']
+        for key in table_keys:
+            if key not in cat.columns.names:
+                print 'WARNING: No key '+key+' in table of '+fname+'. Skipping calculation!'
+                sys.stdout.flush()
+                return True
 
 
         # Main loop: scan over the fields and generate new maps
@@ -293,6 +312,19 @@ def prep_fourier(args):
                 # Remove file to save space
                 if args.remove_files:
                     os.remove(badname)
+
+            # Remove bad galaxies from mask
+            bad_fields = [x.split('_')[0].split('/')[-1] for x in urls]
+            filter = np.array([x[:6] in bad_fields for x in cat['id']])
+            pos = zip(cat['ALPHA_J2000'][filter],cat['DELTA_J2000'][filter])
+            # Calculate Pixel position of each galaxy
+            pos = w.wcs_world2pix(pos, 1).astype(int)
+            pos = np.flip(pos,axis=1) #Need to invert the columns
+            # Pixels where at least one galaxy has been found
+            pos = np.unique(pos, axis=0)
+            mask[pos[:,0], pos[:,1]] = 0
+            print '----> Removed galaxies in bad fields for '+f+'!'
+            sys.stdout.flush()
 
 
             # Save to file the map
@@ -596,7 +628,7 @@ def prep_fourier(args):
             x = photo_z[0]
             for count in range(1,len(photo_z)):
                 y = photo_z[count]
-                plt.plot(x, y, label = 'Bin ' + str(count+1))
+                plt.plot(x, y, label = 'Bin ' + str(count))
             plt.xlim(0.,2.)
             plt.xlabel('$z$', fontsize=14)
             plt.ylabel('Probability distribution', fontsize=14)
@@ -633,30 +665,30 @@ def prep_fourier(args):
         mins, secs = divmod(rem, 60)
         print 'Run MASK module in {:0>2} Hours {:0>2} Minutes {:05.2f} Seconds!'.format(int(hrs),int(mins),secs)
         sys.stdout.flush()
-    if is_run_cat:
-        start = time.clock()
-        warning = run_cat() or warning
-        end = time.clock()
-        hrs, rem = divmod(end-start, 3600)
-        mins, secs = divmod(rem, 60)
-        print 'Run CATALOGUE module in {:0>2} Hours {:0>2} Minutes {:05.2f} Seconds!'.format(int(hrs),int(mins),secs)
-        sys.stdout.flush()
-    if is_run_mult:
-        start = time.clock()
-        warning = run_mult() or warning
-        end = time.clock()
-        hrs, rem = divmod(end-start, 3600)
-        mins, secs = divmod(rem, 60)
-        print 'Run MULT_CORR module in {:0>2} Hours {:0>2} Minutes {:05.2f} Seconds!'.format(int(hrs),int(mins),secs)
-        sys.stdout.flush()
-    if is_run_pz:
-        start = time.clock()
-        warning = run_pz() or warning
-        end = time.clock()
-        hrs, rem = divmod(end-start, 3600)
-        mins, secs = divmod(rem, 60)
-        print 'Run PHOTO_Z module in {:0>2} Hours {:0>2} Minutes {:05.2f} Seconds!'.format(int(hrs),int(mins),secs)
-        sys.stdout.flush()
+    # if is_run_cat:
+    #     start = time.clock()
+    #     warning = run_cat() or warning
+    #     end = time.clock()
+    #     hrs, rem = divmod(end-start, 3600)
+    #     mins, secs = divmod(rem, 60)
+    #     print 'Run CATALOGUE module in {:0>2} Hours {:0>2} Minutes {:05.2f} Seconds!'.format(int(hrs),int(mins),secs)
+    #     sys.stdout.flush()
+    # if is_run_mult:
+    #     start = time.clock()
+    #     warning = run_mult() or warning
+    #     end = time.clock()
+    #     hrs, rem = divmod(end-start, 3600)
+    #     mins, secs = divmod(rem, 60)
+    #     print 'Run MULT_CORR module in {:0>2} Hours {:0>2} Minutes {:05.2f} Seconds!'.format(int(hrs),int(mins),secs)
+    #     sys.stdout.flush()
+    # if is_run_pz:
+    #     start = time.clock()
+    #     warning = run_pz() or warning
+    #     end = time.clock()
+    #     hrs, rem = divmod(end-start, 3600)
+    #     mins, secs = divmod(rem, 60)
+    #     print 'Run PHOTO_Z module in {:0>2} Hours {:0>2} Minutes {:05.2f} Seconds!'.format(int(hrs),int(mins),secs)
+    #     sys.stdout.flush()
     # if is_run_map:
     #     start = time.clock()
     #     warning = run_map() or warning

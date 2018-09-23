@@ -122,7 +122,8 @@ def prep_fourier(args):
         sys.stdout.flush()
     if is_run_cat:
         nofile1 = not(os.path.exists(path['cat_full']))
-        if nofile1:
+        nofile2 = np.array([not(os.path.exists(path['m_'+f])) for f in fields]).any()
+        if nofile1 or (not(is_run_mult) and nofile2):
             print 'WARNING: I will skip the CATALOGUE module. Input file not found!'
             sys.stdout.flush()
             is_run_cat = False
@@ -133,8 +134,7 @@ def prep_fourier(args):
     if is_run_map:
         nofile1 = np.array([not(os.path.exists(path['mask_'+f])) for f in fields]).any()
         nofile2 = np.array([not(os.path.exists(path['cat_'+f])) for f in fields]).any()
-        nofile3 = np.array([not(os.path.exists(path['m_'+f])) for f in fields]).any()
-        if (not(is_run_mask) and nofile1) or (not(is_run_cat) and nofile2) or (not(is_run_mult) and nofile3):
+        if (not(is_run_mask) and nofile1) or (not(is_run_cat) and nofile2):
             print 'WARNING: I will skip the MAP module. Input files not found!'
             sys.stdout.flush()
             is_run_map = False
@@ -172,7 +172,7 @@ def prep_fourier(args):
                 return True
 
 
-        # Main loop: scan over the fields and generate new maps
+        # First loop: scan over the fields and generate new maps
         for f in fields:
             print 'Calculating mask for field ' + f + ':'
             sys.stdout.flush()
@@ -373,7 +373,7 @@ def prep_fourier(args):
                 return True
 
 
-        # Main loop: scan over the fields
+        # First loop: scan over the fields
         for f in fields:
 
             # Remove old output file to avoid confusion
@@ -395,7 +395,7 @@ def prep_fourier(args):
             # Create a new WCS object
             w = wcs.WCS(hd)
 
-            # Second loop to divide galaxies in redshift bins
+            # Second loop: divide galaxies in redshift bins
             for n_z_bin, z_bin in enumerate(z_bins):
 
                 print 'Calculating multiplicative correction for field ' + f + ' and bin {}:'.format(n_z_bin+1)
@@ -522,7 +522,7 @@ def prep_fourier(args):
         photo_z[0] = (np.arange(len(pz_full[0]))+1./2.)*set.dZ_CFHTlens
 
 
-        # Main loop: for each bin calculate photo_z, n_eff and sigma_g
+        # First loop: for each bin calculate photo_z, n_eff and sigma_g
         for n_z_bin, z_bin in enumerate(z_bins):
             # Filter galaxies
             filter = set.filter_galaxies(cat, z_bin[0], z_bin[1])
@@ -530,11 +530,11 @@ def prep_fourier(args):
             pz_z = pz_full[filter]
 
             # Multiplicative correction
-            def find_correction(w, gal, n_z_bin):
+            def find_m_correction(gal):
                 pix = w[gal['id'][:2]].wcs_world2pix([[gal['ALPHA_J2000'],gal['DELTA_J2000']]],1)
                 pix = tuple(np.flip(pix.astype(int),axis=1)[0])
                 return m[gal['id'][:2]][n_z_bin][pix]
-            m_corr = np.array([find_correction(w, gal, n_z_bin) for gal in gals])
+            m_corr = np.array([find_m_correction(gal) for gal in gals])
             # Weights
             w_sum = gals['weight'].sum()
             w2_sum = (gals['weight']**2.).sum()
@@ -606,7 +606,7 @@ def prep_fourier(args):
                 return True
 
 
-        # Main loop: scan over the fields
+        # First loop: scan over the fields
         for f in fields:
 
             # Remove old output file to avoid confusion
@@ -615,24 +615,45 @@ def prep_fourier(args):
             except:
                 pass
 
-            # Second loop to divide galaxies in redshift bins
+            # Second loop: divide galaxies in redshift bins
             for n_z_bin, z_bin in enumerate(z_bins):
 
                 print 'Calculating catalogue for field ' + f + ' and bin {}:'.format(n_z_bin+1)
                 sys.stdout.flush()
 
+
+                # Read multiplicative corrections
+                fname = path['m_'+f]
+                imname = 'MULT_CORR_{}_Z{}'.format(f, n_z_bin+1)
+                try:
+                    m = io.read_from_fits(fname, imname)
+                    hd = io.read_header_from_fits(fname, imname)
+                except KeyError:
+                    print 'WARNING: No key '+imname+' in '+fname+'. Skipping calculation!'
+                    sys.stdout.flush()
+                    return True
+                # Create a new WCS object
+                w = wcs.WCS(hd)
+
                 # Filter galaxies
                 filter = set.filter_galaxies(cat, z_bin[0], z_bin[1], field=f)
                 gals = cat[filter]
 
+                # Calculate corrected ellipticities
+                def find_m_correction(gal):
+                    pix = w.wcs_world2pix([[gal['ALPHA_J2000'],gal['DELTA_J2000']]],1)
+                    pix = tuple(np.flip(pix.astype(int),axis=1)[0])
+                    return m[pix]
+                m_corr = np.array([find_m_correction(gal) for gal in gals])
+                # Ellipticities
+                gals['e1'] = gals['e1']/(1+m_corr)
+                gals['e2'] = (gals['e2']-gals['c2'])/(1+m_corr)
+
                 # Create Table and save it
-                table_keys = ['ALPHA_J2000', 'DELTA_J2000', 'e1', 'e2', 'c1', 'c2', 'weight']
+                table_keys = ['ALPHA_J2000', 'DELTA_J2000', 'e1', 'e2', 'weight']
                 columns = []
                 for key in table_keys:
-                    if key=='c1':
-                        columns.append(fits.Column(name=key,array=np.zeros(len(gals)),format='E'))
-                    else:
-                        columns.append(fits.Column(name=key,array=gals[key],format='E'))
+                    columns.append(fits.Column(name=key,array=gals[key],format='E'))
                 name = 'CAT_{}_Z{}'.format(f, n_z_bin+1)
                 gals = fits.BinTableHDU.from_columns(columns, name=name)
                 warning = io.write_to_fits(path['cat_'+f], gals, name, type='table') or warning
@@ -681,14 +702,14 @@ def prep_fourier(args):
         mins, secs = divmod(rem, 60)
         print 'Run PHOTO_Z module in {:0>2} Hours {:0>2} Minutes {:05.2f} Seconds!'.format(int(hrs),int(mins),secs)
         sys.stdout.flush()
-    # if is_run_cat:
-    #     start = time.clock()
-    #     warning = run_cat() or warning
-    #     end = time.clock()
-    #     hrs, rem = divmod(end-start, 3600)
-    #     mins, secs = divmod(rem, 60)
-    #     print 'Run CATALOGUE module in {:0>2} Hours {:0>2} Minutes {:05.2f} Seconds!'.format(int(hrs),int(mins),secs)
-    #     sys.stdout.flush()
+    if is_run_cat:
+        start = time.clock()
+        warning = run_cat() or warning
+        end = time.clock()
+        hrs, rem = divmod(end-start, 3600)
+        mins, secs = divmod(rem, 60)
+        print 'Run CATALOGUE module in {:0>2} Hours {:0>2} Minutes {:05.2f} Seconds!'.format(int(hrs),int(mins),secs)
+        sys.stdout.flush()
     # if is_run_map:
     #     start = time.clock()
     #     warning = run_map() or warning
@@ -730,13 +751,13 @@ def prep_fourier(args):
     #
     #
     #
-    # # Main loop to scan over the fields
+    # # First loop: to scan over the fields
     # for f in fields:
     #
     #
     #
     #
-    #     # Second loop to divide galaxies in redshift bins
+    #     # Second loop: divide galaxies in redshift bins
     #     for n_z_bin, z_bin in enumerate(z_bins):
     #
     #         # Calculating the map

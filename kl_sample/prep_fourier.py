@@ -72,15 +72,15 @@ def prep_fourier(args):
     is_run_mask = np.array([not(os.path.exists(path['mask_'+f])) for f in fields]).any()
     if args.run_mask:
         is_run_mask = True
-    is_run_cat = np.array([not(os.path.exists(path['cat_'+f])) for f in fields]).any()
-    if args.run_cat:
-        is_run_cat = True
     is_run_mult = np.array([not(os.path.exists(path['m_'+f])) for f in fields]).any()
     if args.run_mult:
         is_run_mult = True
     is_run_pz = not(os.path.exists(path['photo_z']))
     if args.run_pz:
         is_run_pz = True
+    is_run_cat = np.array([not(os.path.exists(path['cat_'+f])) for f in fields]).any()
+    if args.run_cat:
+        is_run_cat = True
     is_run_map = np.array([not(os.path.exists(path['map_'+f])) for f in fields]).any()
     if args.run_map:
         is_run_map = True
@@ -98,20 +98,10 @@ def prep_fourier(args):
     else:
         print 'I will skip the MASK module. Output files already there!'
         sys.stdout.flush()
-    if is_run_cat:
-        nofile1 = not(os.path.exists(path['cat_full']))
-        if nofile1:
-            print 'WARNING: I will skip the CATALOGUE module. Input file not found!'
-            sys.stdout.flush()
-            is_run_cat = False
-            warning = True
-    else:
-        print 'I will skip the CATALOGUE module. Output files already there!'
-        sys.stdout.flush()
     if is_run_mult:
         nofile1 = np.array([not(os.path.exists(path['mask_'+f])) for f in fields]).any()
-        nofile2 = np.array([not(os.path.exists(path['cat_'+f])) for f in fields]).any()
-        if (not(is_run_mask) and nofile1) or (not(is_run_cat) and nofile2):
+        nofile2 = not(os.path.exists(path['cat_full']))
+        if (not(is_run_mask) and nofile1) or nofile2:
             print 'WARNING: I will skip the MULT_CORR module. Input file not found!'
             sys.stdout.flush()
             is_run_mult = False
@@ -129,6 +119,16 @@ def prep_fourier(args):
             warning = True
     else:
         print 'I will skip the PHOTO_Z module. Output file already there!'
+        sys.stdout.flush()
+    if is_run_cat:
+        nofile1 = not(os.path.exists(path['cat_full']))
+        if nofile1:
+            print 'WARNING: I will skip the CATALOGUE module. Input file not found!'
+            sys.stdout.flush()
+            is_run_cat = False
+            warning = True
+    else:
+        print 'I will skip the CATALOGUE module. Output files already there!'
         sys.stdout.flush()
     if is_run_map:
         nofile1 = np.array([not(os.path.exists(path['mask_'+f])) for f in fields]).any()
@@ -154,12 +154,12 @@ def prep_fourier(args):
         warning = False
 
         # Read galaxy catalogue
-        table_name = 'data'
+        tabname = 'data'
         fname = path['cat_full']
         try:
-            cat = io.read_from_fits(fname, table_name)
+            cat = io.read_from_fits(fname, tabname)
         except KeyError:
-            print 'WARNING: No key '+table_name+' in '+fname+'. Skipping calculation!'
+            print 'WARNING: No key '+tabname+' in '+fname+'. Skipping calculation!'
             sys.stdout.flush()
             return True
 
@@ -345,71 +345,6 @@ def prep_fourier(args):
 
 
 
-# ------------------- Function to calculate the clean catalogue ---------------#
-
-    def run_cat(path=path, fields=fields, z_bins=z_bins):
-
-        print 'Running CATALOGUE module'
-        sys.stdout.flush()
-        warning = False
-
-
-        # Read galaxy catalogue
-        table_name = 'data'
-        fname = path['cat_full']
-        try:
-            cat = io.read_from_fits(fname, table_name)
-        except KeyError:
-            print 'WARNING: No key '+table_name+' in '+fname+'. Skipping calculation!'
-            sys.stdout.flush()
-            return True
-
-        # Check that the table has the correct columns
-        table_keys = ['ALPHA_J2000', 'DELTA_J2000', 'e1', 'e2', 'c2', 'weight', 'id', 'Z_B', 'MASK', 'star_flag']
-        for key in table_keys:
-            if key not in cat.columns.names:
-                print 'WARNING: No key '+key+' in table of '+fname+'. Skipping calculation!'
-                sys.stdout.flush()
-                return True
-
-
-        # Main loop: scan over the fields
-        for f in fields:
-
-            # Remove old output file to avoid confusion
-            try:
-                os.remove(path['cat_'+f])
-            except:
-                pass
-
-            # Second loop to divide galaxies in redshift bins
-            for n_z_bin, z_bin in enumerate(z_bins):
-
-                print 'Calculating catalogue for field ' + f + ' and bin {}:'.format(n_z_bin+1)
-                sys.stdout.flush()
-
-                # Filter galaxies
-                filter = set.filter_galaxies(cat, z_bin[0], z_bin[1], field=f)
-                gals = cat[filter]
-
-                # Create Table and save it
-                table_keys = ['ALPHA_J2000', 'DELTA_J2000', 'e1', 'e2', 'c1', 'c2', 'weight']
-                columns = []
-                for key in table_keys:
-                    if key=='c1':
-                        columns.append(fits.Column(name=key,array=np.zeros(len(gals)),format='E'))
-                    else:
-                        columns.append(fits.Column(name=key,array=gals[key],format='E'))
-                name = 'CAT_{}_Z{}'.format(f, n_z_bin+1)
-                gals = fits.BinTableHDU.from_columns(columns, name=name)
-                warning = io.write_to_fits(path['cat_'+f], gals, name, type='table') or warning
-
-            io.print_info_fits(path['cat_'+f])
-
-        return warning
-
-
-
 # ------------------- Function to calculate the multiplicative correction -----#
 
     def run_mult(path=path, fields=fields, z_bins=z_bins, n_avg_m=n_avg_m):
@@ -420,12 +355,12 @@ def prep_fourier(args):
 
 
         # Read galaxy catalogue
-        table_name = 'data'
+        tabname = 'data'
         fname = path['cat_full']
         try:
-            cat = io.read_from_fits(fname, table_name)
+            cat = io.read_from_fits(fname, tabname)
         except KeyError:
-            print 'WARNING: No key '+table_name+' in '+fname+'. Skipping calculation!'
+            print 'WARNING: No key '+tabname+' in '+fname+'. Skipping calculation!'
             sys.stdout.flush()
             return True
 
@@ -528,7 +463,7 @@ def prep_fourier(args):
 
 
 
-# ------------------- Function to calculate the multiplicative correction -----#
+# ------------------- Function to calculate the photo_z -----------------------#
 
     def run_pz(path=path, z_bins=z_bins):
 
@@ -537,13 +472,13 @@ def prep_fourier(args):
         warning = False
 
         # Read galaxy catalogue
-        table_name = 'data'
+        tabname = 'data'
         imname = 'pz_full'
         fname = path['cat_full']
         try:
-            cat = io.read_from_fits(fname, table_name)
+            cat = io.read_from_fits(fname, tabname)
         except KeyError:
-            print 'WARNING: No key '+table_name+' in '+fname+'. Skipping calculation!'
+            print 'WARNING: No key '+tabname+' in '+fname+'. Skipping calculation!'
             sys.stdout.flush()
             return True
         try:
@@ -643,6 +578,71 @@ def prep_fourier(args):
 
 
 
+# ------------------- Function to calculate the clean catalogue ---------------#
+
+    def run_cat(path=path, fields=fields, z_bins=z_bins):
+
+        print 'Running CATALOGUE module'
+        sys.stdout.flush()
+        warning = False
+
+
+        # Read galaxy catalogue
+        tabname = 'data'
+        fname = path['cat_full']
+        try:
+            cat = io.read_from_fits(fname, tabname)
+        except KeyError:
+            print 'WARNING: No key '+tabname+' in '+fname+'. Skipping calculation!'
+            sys.stdout.flush()
+            return True
+
+        # Check that the table has the correct columns
+        table_keys = ['ALPHA_J2000', 'DELTA_J2000', 'e1', 'e2', 'c2', 'weight', 'id', 'Z_B', 'MASK', 'star_flag']
+        for key in table_keys:
+            if key not in cat.columns.names:
+                print 'WARNING: No key '+key+' in table of '+fname+'. Skipping calculation!'
+                sys.stdout.flush()
+                return True
+
+
+        # Main loop: scan over the fields
+        for f in fields:
+
+            # Remove old output file to avoid confusion
+            try:
+                os.remove(path['cat_'+f])
+            except:
+                pass
+
+            # Second loop to divide galaxies in redshift bins
+            for n_z_bin, z_bin in enumerate(z_bins):
+
+                print 'Calculating catalogue for field ' + f + ' and bin {}:'.format(n_z_bin+1)
+                sys.stdout.flush()
+
+                # Filter galaxies
+                filter = set.filter_galaxies(cat, z_bin[0], z_bin[1], field=f)
+                gals = cat[filter]
+
+                # Create Table and save it
+                table_keys = ['ALPHA_J2000', 'DELTA_J2000', 'e1', 'e2', 'c1', 'c2', 'weight']
+                columns = []
+                for key in table_keys:
+                    if key=='c1':
+                        columns.append(fits.Column(name=key,array=np.zeros(len(gals)),format='E'))
+                    else:
+                        columns.append(fits.Column(name=key,array=gals[key],format='E'))
+                name = 'CAT_{}_Z{}'.format(f, n_z_bin+1)
+                gals = fits.BinTableHDU.from_columns(columns, name=name)
+                warning = io.write_to_fits(path['cat_'+f], gals, name, type='table') or warning
+
+            io.print_info_fits(path['cat_'+f])
+
+        return warning
+
+
+
 # ------------------- Function to calculate the map ---------------------------#
 
     def run_map(path=path, fields=fields, z_bins=z_bins):
@@ -665,6 +665,22 @@ def prep_fourier(args):
         mins, secs = divmod(rem, 60)
         print 'Run MASK module in {:0>2} Hours {:0>2} Minutes {:05.2f} Seconds!'.format(int(hrs),int(mins),secs)
         sys.stdout.flush()
+    if is_run_mult:
+        start = time.clock()
+        warning = run_mult() or warning
+        end = time.clock()
+        hrs, rem = divmod(end-start, 3600)
+        mins, secs = divmod(rem, 60)
+        print 'Run MULT_CORR module in {:0>2} Hours {:0>2} Minutes {:05.2f} Seconds!'.format(int(hrs),int(mins),secs)
+        sys.stdout.flush()
+    if is_run_pz:
+        start = time.clock()
+        warning = run_pz() or warning
+        end = time.clock()
+        hrs, rem = divmod(end-start, 3600)
+        mins, secs = divmod(rem, 60)
+        print 'Run PHOTO_Z module in {:0>2} Hours {:0>2} Minutes {:05.2f} Seconds!'.format(int(hrs),int(mins),secs)
+        sys.stdout.flush()
     # if is_run_cat:
     #     start = time.clock()
     #     warning = run_cat() or warning
@@ -672,22 +688,6 @@ def prep_fourier(args):
     #     hrs, rem = divmod(end-start, 3600)
     #     mins, secs = divmod(rem, 60)
     #     print 'Run CATALOGUE module in {:0>2} Hours {:0>2} Minutes {:05.2f} Seconds!'.format(int(hrs),int(mins),secs)
-    #     sys.stdout.flush()
-    # if is_run_mult:
-    #     start = time.clock()
-    #     warning = run_mult() or warning
-    #     end = time.clock()
-    #     hrs, rem = divmod(end-start, 3600)
-    #     mins, secs = divmod(rem, 60)
-    #     print 'Run MULT_CORR module in {:0>2} Hours {:0>2} Minutes {:05.2f} Seconds!'.format(int(hrs),int(mins),secs)
-    #     sys.stdout.flush()
-    # if is_run_pz:
-    #     start = time.clock()
-    #     warning = run_pz() or warning
-    #     end = time.clock()
-    #     hrs, rem = divmod(end-start, 3600)
-    #     mins, secs = divmod(rem, 60)
-    #     print 'Run PHOTO_Z module in {:0>2} Hours {:0>2} Minutes {:05.2f} Seconds!'.format(int(hrs),int(mins),secs)
     #     sys.stdout.flush()
     # if is_run_map:
     #     start = time.clock()

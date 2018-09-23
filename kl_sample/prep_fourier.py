@@ -672,6 +672,106 @@ def prep_fourier(args):
         sys.stdout.flush()
         warning = False
 
+
+        # First loop: scan over the fields
+        for f in fields:
+
+            # Remove old output file to avoid confusion
+            try:
+                os.remove(path['map_'+f])
+            except:
+                pass
+
+            # Read mask and create WCS object
+            imname = 'MASK_{}'.format(f)
+            fname = path['mask_'+f]
+            try:
+                mask = io.read_from_fits(fname, imname)
+                hd = io.read_header_from_fits(fname, imname)
+            except KeyError:
+                print 'WARNING: No key '+imname+' in '+fname+'. Skipping calculation!'
+                sys.stdout.flush()
+                return True
+            # Create a new WCS object
+            w = wcs.WCS(hd)
+
+            # Second loop: divide galaxies in redshift bins
+            for n_z_bin, z_bin in enumerate(z_bins):
+
+                print 'Calculating map for field ' + f + ' and bin {}:'.format(n_z_bin+1)
+                sys.stdout.flush()
+
+
+                # Read galaxy catalogue
+                tabname = 'CAT_{}_Z{}'.format(f, n_z_bin+1)
+                fname = path['cat_'+f]
+                try:
+                    cat = io.read_from_fits(fname, tabname)
+                except KeyError:
+                    print 'WARNING: No key '+tabname+' in '+fname+'. Skipping calculation!'
+                    sys.stdout.flush()
+                    return True
+
+                # Check that the table has the correct columns
+                table_keys = ['ALPHA_J2000', 'DELTA_J2000', 'e1', 'e2', 'weight']
+                for key in table_keys:
+                    if key not in cat.columns.names:
+                        print 'WARNING: No key '+key+' in table of '+fname+'. Skipping calculation!'
+                        sys.stdout.flush()
+                        return True
+
+                # Create arrays for the two shears
+                map_1 = np.zeros(mask.shape)
+                map_2 = np.zeros(mask.shape)
+
+                # Get World position of each galaxy
+                pos = zip(cat['ALPHA_J2000'],cat['DELTA_J2000'])
+                # Calculate Pixel position of each galaxy
+                pos = w.wcs_world2pix(pos, 1).astype(int)
+                pos = np.flip(pos,axis=1) #Need to invert the columns
+                # Pixels where at least one galaxy has been found
+                pos_unique = np.unique(pos, axis=0)
+
+                print '----> Empty pixels: {0:5.2%}'.format(1.-np.array([mask[tuple(x)] for x in pos_unique]).sum()/mask.flatten().sum())
+                sys.stdout.flush()
+
+
+                # Scan over the populated pixels and calculate the shear
+                for count, pix in enumerate(pos_unique):
+                    # Select galaxies in a pixel
+                    sel = (pos[:,0] == pix[0])*(pos[:,1] == pix[1])
+                    e1 = cat[sel]['e1']
+                    e2 = cat[sel]['e2']
+                    weight = cat[sel]['weight']
+                    # Calculate shear
+                    map_1[tuple(pix)] = np.average(e1, weights=weight)
+                    map_2[tuple(pix)] = np.average(e2, weights=weight)
+
+                    # Print every some step
+                    if (count+1) % 1000 == 0:
+                        print '----> Done {0:5.1%} of the pixels ({1:d})'.format(float(count+1) /len(pos_unique), len(pos_unique))
+                        sys.stdout.flush()
+
+
+                # Save to file the map
+                name = 'MAP_{}_Z{}_G1'.format(f, n_z_bin+1)
+                warning = io.write_to_fits(path['map_'+f], map_1, name, header=hd, type='image') or warning
+                name = 'MAP_{}_Z{}_G2'.format(f, n_z_bin+1)
+                warning = io.write_to_fits(path['map_'+f], map_2, name, header=hd, type='image') or warning
+
+                # Generate plots
+                if args.want_plots:
+                    plt.imshow(map_1,interpolation='nearest')
+                    plt.colorbar()
+                    plt.savefig(path['base']+'/map_{}_z{}_g1.pdf'.format(f, n_z_bin+1))
+                    plt.close()
+                    plt.imshow(map_2,interpolation='nearest')
+                    plt.colorbar()
+                    plt.savefig(path['base']+'/map_{}_z{}_g2.pdf'.format(f, n_z_bin+1))
+                    plt.close()
+
+            io.print_info_fits(path['map_'+f])
+
         return warning
 
 
@@ -710,14 +810,14 @@ def prep_fourier(args):
         mins, secs = divmod(rem, 60)
         print 'Run CATALOGUE module in {:0>2} Hours {:0>2} Minutes {:05.2f} Seconds!'.format(int(hrs),int(mins),secs)
         sys.stdout.flush()
-    # if is_run_map:
-    #     start = time.clock()
-    #     warning = run_map() or warning
-    #     end = time.clock()
-    #     hrs, rem = divmod(end-start, 3600)
-    #     mins, secs = divmod(rem, 60)
-    #     print 'Run MAP module in {:0>2} Hours {:0>2} Minutes {:05.2f} Seconds!'.format(int(hrs),int(mins),secs)
-    #     sys.stdout.flush()
+    if is_run_map:
+        start = time.clock()
+        warning = run_map() or warning
+        end = time.clock()
+        hrs, rem = divmod(end-start, 3600)
+        mins, secs = divmod(rem, 60)
+        print 'Run MAP module in {:0>2} Hours {:0>2} Minutes {:05.2f} Seconds!'.format(int(hrs),int(mins),secs)
+        sys.stdout.flush()
 
     if warning:
         print 'Done! However something went unexpectedly!! Check your warnings!'
@@ -725,107 +825,3 @@ def prep_fourier(args):
     else:
         print 'Success!!'
         sys.stdout.flush()
-
-
-
-
-    #     io.path_exists_or_error(path['mask_sec_'+f])
-    # path['base'] = io.path_exists_or_error(args.input_path)
-
-
-    # # Local variables
-    # dim_orig = 1 # Original pixel dimension of the mask in arcsec
-    # dim_new = 120 # New pixel dimension in arcsec
-    # n_avg_m = 2 # Radius of new pixels used to average the multiplicative correction to the shear (n_pixels = (2*n_avg_m+1)**2)
-    #
-    #
-    # # Infer dereived quantities
-    # fields = ['W'+str(x+1) for x in range(4)]
-    # z_bins = np.array([[set.Z_BINS[n], set.Z_BINS[n+1]] for n in np.arange(len(set.Z_BINS)-1)])
-    # dim_ratio = int(np.round(float(dim_new)/float(dim_orig)))
-    #
-    #
-    # # Read galaxy catalogue
-    # gals = io.read_from_fits(path['input']+'/data.fits', 'data')
-    #
-    #
-    #
-    #
-    # # First loop: to scan over the fields
-    # for f in fields:
-    #
-    #
-    #
-    #
-    #     # Second loop: divide galaxies in redshift bins
-    #     for n_z_bin, z_bin in enumerate(z_bins):
-    #
-    #         # Calculating the map
-    #         print 'Calculating map for field ' + f + ' and bin {}:'.format(n_z_bin+1)
-    #         sys.stdout.flush()
-    #
-    #         # Create arrays for the two shears
-    #         map_1 = np.zeros(mask.shape)
-    #         map_2 = np.zeros(mask.shape)
-    #
-    #         # Filter galaxies
-    #         gals_f = gals[set.filter_galaxies(gals, z_bin[0], z_bin[1], field=f)]
-    #
-    #         # World position
-    #         pos_w = np.array([[gals_f['ALPHA_J2000'][x],gals_f['DELTA_J2000'][x]] for x in range(len(gals_f))])
-    #         # Pixel position
-    #         pos_pix = w.wcs_world2pix(pos_w, 1).astype(int)
-    #         pos_pix = np.flip(pos_pix,axis=1) #Need to invert the columns
-    #         # Pixels where at least one galaxy has been found
-    #         pix_gals = np.unique(pos_pix, axis=0)
-    #
-    #         print '----> Empty pixels: {0:5.2%}'.format(1.-np.array([mask[tuple(x)] for x in pix_gals]).sum()/mask.flatten().sum())
-    #         sys.stdout.flush()
-    #
-    #         # Scan over the populated pixels and calculate the shear
-    #         for count, pix in enumerate(pix_gals):
-    #             # Calculate averaged multiplicative correction
-    #             if pix[0]-n_avg_m<0:
-    #                 s1 = 0
-    #             elif pix[0]+n_avg_m>=mask.shape[0]:
-    #                 s1 = mask.shape[0]-(2*n_avg_m+1)
-    #             else:
-    #                 s1 = pix[0]-n_avg_m
-    #             if pix[1]-n_avg_m<0:
-    #                 s2 = 0
-    #             elif pix[1]+n_avg_m>=mask.shape[1]:
-    #                 s2 = mask.shape[1]-(2*n_avg_m+1)
-    #             else:
-    #                 s2 = pix[1]-n_avg_m
-    #             sel = pos_pix[:,0] >= s1
-    #             sel = (pos_pix[:,0] < s1+2*n_avg_m+1)*sel
-    #             sel = (pos_pix[:,1] >= s2)*sel
-    #             sel = (pos_pix[:,1] < s2+2*n_avg_m+1)*sel
-    #             m = gals_f[sel]['m']
-    #             weight = gals_f[sel]['weight']
-    #             m = np.average(m, weights=weight)
-    #             # Select galaxies in a pixel
-    #             sel = (pos_pix[:,0] == pix[0])*(pos_pix[:,1] == pix[1])
-    #             # Define quantities
-    #             e1 = gals_f[sel]['e1']
-    #             e2 = gals_f[sel]['e2']
-    #             c2 = gals_f[sel]['c2']
-    #             weight = gals_f[sel]['weight']
-    #             # Calculate shear
-    #             map_1[tuple(pix)] = np.average(e1, weights=weight)/(1+m)
-    #             map_2[tuple(pix)] = np.average(e2-c2, weights=weight)/(1+m)
-    #
-    #             # Print every some step
-    #             if (count+1) % 1000 == 0:
-    #                 print '----> Done {0:5.1%} of the pixels ({1:d})'.format(float(count+1) /len(pix_gals), len(pix_gals))
-    #                 sys.stdout.flush()
-    #
-    #         print '----> Shear calculation finished!'
-    #         sys.stdout.flush()
-    #
-    #         # Write to file
-    #         fname = path['input']+'/'+f+'_map.fits'
-    #         name_1 = f+'_g1_z'+str(n_z_bin+1)+'_map'
-    #         name_2 = f+'_g2_z'+str(n_z_bin+1)+'_map'
-    #         io.write_to_fits(fname, map_1, name_1, header=hd)
-    #         io.write_to_fits(fname, map_2, name_2, header=hd)

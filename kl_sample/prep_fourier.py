@@ -57,7 +57,7 @@ def prep_fourier(args):
     path = {}
     path['base'], path['fname'] = os.path.split(os.path.abspath(args.input_path))
     io.path_exists_or_error(path['base'])
-    path['cat_full'] = path['base']+'/'+path['fname']+'full_cat.fits'
+    path['cat_full'] = path['base']+'/'+path['fname']+'cat_full.fits'
     path['mask_url'] = path['base']+'/mask_url.txt'
     path['photo_z'] = path['base']+'/photo_z.fits'
     for f in fields:
@@ -757,7 +757,7 @@ def prep_fourier(args):
                 print '----> Empty pixels: {0:5.2%}'.format(1.-np.array([mask[tuple(x)] for x in pos_unique]).sum()/mask.flatten().sum())
                 sys.stdout.flush()
 
-                # start = time.clock()
+                # Old code: very slow!
                 # # Pixels where at least one galaxy has been found
                 # pos_unique = np.unique(pos, axis=0)
                 # for count, pix in enumerate(pos_unique):
@@ -769,8 +769,6 @@ def prep_fourier(args):
                 #     # Calculate shear
                 #     map_1[tuple(pix)] = np.average(e1, weights=weight)
                 #     map_2[tuple(pix)] = np.average(e2, weights=weight)
-                # end = time.clock()
-                # print 'Run in {:05.2f} Seconds!'.format(end-start)
 
 
                 # Save to file the map

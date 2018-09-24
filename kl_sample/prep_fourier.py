@@ -453,7 +453,7 @@ def prep_fourier(args):
                 if args.want_plots:
                     plt.imshow(mult_corr,interpolation='nearest')
                     plt.colorbar()
-                    plt.savefig(path['base']+'/mult_corr_{}_z{}.pdf'.format(f, n_z_bin+1))
+                    plt.savefig(path['base']+'/'+path['fname']+'mult_corr_{}_z{}.pdf'.format(f, n_z_bin+1))
                     plt.close()
 
             io.print_info_fits(path['m_'+f])
@@ -785,7 +785,7 @@ def prep_fourier(args):
                     plt.close()
                     plt.imshow(map_2,interpolation='nearest')
                     plt.colorbar()
-                    plt.savefig(path['base']+'/map_{}_z{}_g2.pdf'.format(f, n_z_bin+1))
+                    plt.savefig(path['base']+'/'+path['fname']+'map_{}_z{}_g2.pdf'.format(f, n_z_bin+1))
                     plt.close()
 
             io.print_info_fits(path['map_'+f])

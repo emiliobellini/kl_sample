@@ -757,19 +757,6 @@ def prep_fourier(args):
                 print '----> Empty pixels: {0:5.2%}'.format(1.-np.array([mask[tuple(x)] for x in pos_unique]).sum()/mask.flatten().sum())
                 sys.stdout.flush()
 
-                # Old code: very slow!
-                # # Pixels where at least one galaxy has been found
-                # pos_unique = np.unique(pos, axis=0)
-                # for count, pix in enumerate(pos_unique):
-                #     # Select galaxies in a pixel
-                #     sel = (pos[:,0] == pix[0])*(pos[:,1] == pix[1])
-                #     e1 = cat[sel]['e1']
-                #     e2 = cat[sel]['e2']
-                #     weight = cat[sel]['weight']
-                #     # Calculate shear
-                #     map_1[tuple(pix)] = np.average(e1, weights=weight)
-                #     map_2[tuple(pix)] = np.average(e2, weights=weight)
-
 
                 # Save to file the map
                 name = 'MAP_{}_Z{}_G1'.format(f, n_z_bin+1)
@@ -781,7 +768,7 @@ def prep_fourier(args):
                 if args.want_plots:
                     plt.imshow(map_1,interpolation='nearest')
                     plt.colorbar()
-                    plt.savefig(path['base']+'/map_{}_z{}_g1.pdf'.format(f, n_z_bin+1))
+                    plt.savefig(path['base']+'/'+path['fname']+'map_{}_z{}_g1.pdf'.format(f, n_z_bin+1))
                     plt.close()
                     plt.imshow(map_2,interpolation='nearest')
                     plt.colorbar()

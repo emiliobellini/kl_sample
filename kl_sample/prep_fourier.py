@@ -302,8 +302,8 @@ def prep_fourier(args):
                 ends[-1] = mask_bad.shape[0]
                 for start, end in zip(starts, ends):
                     pos_bad = (start,0)+np.stack(np.where(mask_bad[start:end]<8192), axis=-1).astype(np.int32)
-                    pos_bad = w_bad.wcs_pix2world(pos_bad, 1).astype(np.float32)
-                    pos_bad = np.around(w.wcs_world2pix(pos_bad, 1)).astype(np.int32)
+                    pos_bad = w_bad.wcs_pix2world(pos_bad, 0).astype(np.float32)
+                    pos_bad = np.around(w.wcs_world2pix(pos_bad, 0)).astype(np.int32)
                     pos_bad = np.flip(pos_bad,axis=1) #Need to invert the columns
                     pos_bad = np.unique(pos_bad, axis=0)
                     mask[pos_bad[:,0], pos_bad[:,1]] = 0
@@ -319,7 +319,7 @@ def prep_fourier(args):
             filter = np.array([x[:6] in bad_fields for x in cat['id']])
             pos = zip(cat['ALPHA_J2000'][filter],cat['DELTA_J2000'][filter])
             # Calculate Pixel position of each galaxy
-            pos = w.wcs_world2pix(pos, 1).astype(int)
+            pos = w.wcs_world2pix(pos, 0).astype(int)
             pos = np.flip(pos,axis=1) #Need to invert the columns
             # Pixels where at least one galaxy has been found
             pos = np.unique(pos, axis=0)
@@ -413,7 +413,7 @@ def prep_fourier(args):
                 # Get World position of each galaxy
                 pos = zip(gals['ALPHA_J2000'],gals['DELTA_J2000'])
                 # Calculate Pixel position of each galaxy
-                pos = w.wcs_world2pix(pos, 1).astype(int)
+                pos = w.wcs_world2pix(pos, 0).astype(int)
                 pos = np.flip(pos,axis=1) #Need to invert the columns
                 # Pixels where at least one galaxy has been found
                 pos_unique = np.unique(pos, axis=0)
@@ -532,7 +532,7 @@ def prep_fourier(args):
 
             # Multiplicative correction
             def find_m_correction(gal):
-                pix = w[gal['id'][:2]].wcs_world2pix([[gal['ALPHA_J2000'],gal['DELTA_J2000']]],1)
+                pix = w[gal['id'][:2]].wcs_world2pix([[gal['ALPHA_J2000'],gal['DELTA_J2000']]],0)
                 pix = tuple(np.flip(pix.astype(int),axis=1)[0])
                 return m[gal['id'][:2]][n_z_bin][pix]
             m_corr = np.array([find_m_correction(gal) for gal in gals])
@@ -642,7 +642,7 @@ def prep_fourier(args):
 
                 # Calculate corrected ellipticities
                 def find_m_correction(gal):
-                    pix = w.wcs_world2pix([[gal['ALPHA_J2000'],gal['DELTA_J2000']]],1)
+                    pix = w.wcs_world2pix([[gal['ALPHA_J2000'],gal['DELTA_J2000']]],0)
                     pix = tuple(np.flip(pix.astype(int),axis=1)[0])
                     return m[pix]
                 m_corr = np.array([find_m_correction(gal) for gal in gals])

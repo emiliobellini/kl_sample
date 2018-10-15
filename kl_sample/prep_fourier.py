@@ -111,9 +111,10 @@ def prep_fourier(args):
         print 'I will skip the MULT_CORR module. Output files already there!'
         sys.stdout.flush()
     if is_run_pz:
-        nofile1 = not(os.path.exists(path['cat_full']))
-        nofile2 = np.array([not(os.path.exists(path['m_'+f])) for f in fields]).any()
-        if nofile1 or (not(is_run_mult) and nofile2):
+        nofile1 = np.array([not(os.path.exists(path['m_'+f])) for f in fields]).any()
+        nofile2 = not(os.path.exists(path['cat_full']))
+        nofile3 = np.array([not(os.path.exists(path['m_'+f])) for f in fields]).any()
+        if (not(is_run_mask) and nofile1) or nofile2 or (not(is_run_mult) and nofile3):
             print 'WARNING: I will skip the PHOTO_Z module. Input files not found!'
             sys.stdout.flush()
             is_run_pz = False
@@ -450,12 +451,12 @@ def prep_fourier(args):
                 name = 'MULT_CORR_{}_Z{}'.format(f, n_z_bin+1)
                 warning = io.write_to_fits(path['m_'+f], mult_corr, name, header=hd, type='image') or warning
 
-                # Generate plots
-                if args.want_plots:
-                    plt.imshow(mult_corr,interpolation='nearest')
-                    plt.colorbar()
-                    plt.savefig(path['base']+'/'+path['fname']+'mult_corr_{}_z{}.pdf'.format(f, n_z_bin+1))
-                    plt.close()
+                # # Generate plots
+                # if args.want_plots:
+                #     plt.imshow(mult_corr,interpolation='nearest')
+                #     plt.colorbar()
+                #     plt.savefig(path['base']+'/'+path['fname']+'mult_corr_{}_z{}.pdf'.format(f, n_z_bin+1))
+                #     plt.close()
 
             io.print_info_fits(path['m_'+f])
 
@@ -471,6 +472,30 @@ def prep_fourier(args):
         print 'Running PHOTO_Z module'
         sys.stdout.flush()
         warning = False
+
+
+        # Remove old output file to avoid confusion
+        try:
+            os.remove(path['photo_z'])
+        except:
+            pass
+
+        # Read mask
+        mask = {}
+        w = {}
+        for f in fields:
+            # Read mask and create WCS object
+            imname = 'MASK_{}'.format(f)
+            fname = path['mask_'+f]
+            try:
+                mask[f] = io.read_from_fits(fname, imname)
+                hd = io.read_header_from_fits(fname, imname)
+            except KeyError:
+                print 'WARNING: No key '+imname+' in '+fname+'. Skipping calculation!'
+                sys.stdout.flush()
+                return True
+            # Create a new WCS object
+            w[f] = wcs.WCS(hd)
 
         # Read galaxy catalogue
         tabname = 'data'
@@ -499,7 +524,6 @@ def prep_fourier(args):
 
         # Read multiplicative corrections
         m = {}
-        w = {}
         for f in fields:
             m[f] = {}
             fname = path['m_'+f]
@@ -507,57 +531,118 @@ def prep_fourier(args):
                 imname = 'MULT_CORR_{}_Z{}'.format(f, n_z_bin+1)
                 try:
                     m[f][n_z_bin] = io.read_from_fits(fname, imname)
-                    hd = io.read_header_from_fits(fname, imname)
                 except KeyError:
                     print 'WARNING: No key '+imname+' in '+fname+'. Skipping calculation!'
                     sys.stdout.flush()
                     return True
-            # Create a new WCS object
-            w[f] = wcs.WCS(hd)
+
+
+        # Create filters for each bin and field
+        filter = {}
+        for f in fields:
+            filter[f] = {}
+            for n_z_bin, z_bin in enumerate(z_bins):
+                filt = set.filter_galaxies(cat, z_bin[0], z_bin[1], field=f)
+                pix = np.transpose([cat[filt]['ALPHA_J2000'],cat[filt]['DELTA_J2000']])
+                pix = w[f].wcs_world2pix(pix, 0).astype(int)
+                masked = np.where(np.array([mask[f][iy,ix] for ix,iy in pix])<=0)[0]
+                filt[filt][masked] = False
+                filter[f][n_z_bin] = filt
+        # Print progress message
+        print '----> Created filters!'
+        sys.stdout.flush()
+
+        # Correct ellipticities
+        m_corr = np.zeros(len(cat))
+        for f in fields:
+            for n_z_bin, z_bin in enumerate(z_bins):
+                filt = filter[f][n_z_bin]
+                pix = np.transpose([cat[filt]['ALPHA_J2000'],cat[filt]['DELTA_J2000']])
+                pix = w[f].wcs_world2pix(pix, 0).astype(int)
+                m_corr[filt] = np.array([m[f][n_z_bin][iy,ix] for ix,iy in pix])
+        cat['e1'] = cat['e1']/(1+m_corr)
+        cat['e2'] = (cat['e2']-cat['c2'])/(1+m_corr)
+        # Print progress message
+        print '----> Corrected ellipticities!'
+        sys.stdout.flush()
+
+
+        # Useful functions (area, n_eff, sigma_g)
+        def get_area(fields, mask=mask, size_pix=size_pix):
+            area = 0.
+            for f in fields:
+                area += mask[f].sum()*(size_pix/60.)**2.
+            return area
+        def get_n_eff(cat, area):
+            wsum2 = (cat['weight'].sum())**2
+            w2sum = (cat['weight']**2).sum()
+            return wsum2/w2sum/area
+        def get_sigma_g(cat):
+            w2 = cat['weight']**2
+            sg = np.dot(w2, (cat['e1']**2. + cat['e2']**2.)/2.)/w2.sum()
+            return sg**0.5
 
 
         # Initialize quantities
-        photo_z = np.zeros((len(z_bins)+1,len(pz_full[0])))
         n_eff = np.zeros(len(z_bins))
         sigma_g = np.zeros(len(z_bins))
+        photo_z = np.zeros((len(z_bins)+1,len(pz_full[0])))
         photo_z[0] = (np.arange(len(pz_full[0]))+1./2.)*set.dZ_CFHTlens
+        n_eff_f = np.zeros((len(fields),len(z_bins)))
+        sigma_g_f = np.zeros((len(fields),len(z_bins)))
+        photo_z_f = np.zeros((len(fields),len(z_bins)+1,len(pz_full[0])))
+        for count in range(len(fields)):
+            photo_z_f[count,0] = (np.arange(len(pz_full[0]))+1./2.)*set.dZ_CFHTlens
 
-
-        # First loop: for each bin calculate photo_z, n_eff and sigma_g
+        # First loop: scan over redshift bins
         for n_z_bin, z_bin in enumerate(z_bins):
+
+            # Calculate quantities for each redshift bin
+
+            # Merge filters
+            for f in fields:
+                try:
+                    sel += filter[f][n_z_bin]
+                except:
+                    sel = filter[f][n_z_bin]
             # Filter galaxies
-            filter = set.filter_galaxies(cat, z_bin[0], z_bin[1])
-            gals = cat[filter]
-            pz_z = pz_full[filter]
+            gals = cat[sel]
+            pz_z = pz_full[sel]
+            # Get n_eff
+            area = get_area(fields)
+            n_eff[n_z_bin] = get_n_eff(gals, area)
+            # Get sigma_g
+            sigma_g[n_z_bin] = get_sigma_g(gals)
+            # Get photo_z
+            photo_z[n_z_bin+1] = np.average(pz_z, weights=gals['weight'], axis=0)
 
-            # Multiplicative correction
-            def find_m_correction(gal):
-                pix = w[gal['id'][:2]].wcs_world2pix([[gal['ALPHA_J2000'],gal['DELTA_J2000']]],0)
-                pix = tuple(np.flip(pix.astype(int),axis=1)[0])
-                return m[gal['id'][:2]][n_z_bin][pix]
-            m_corr = np.array([find_m_correction(gal) for gal in gals])
-            # Weights
-            w_sum = gals['weight'].sum()
-            w2_sum = (gals['weight']**2.).sum()
-            e1 = gals['e1']/(1+m_corr)
-            e2 = (gals['e2']-gals['c2'])/(1+m_corr)
 
-            # photo_z
-            photo_z[n_z_bin+1] = np.dot(gals['weight'], pz_z)/w_sum
-            # n_eff
-            n_eff[n_z_bin] = w_sum**2/w2_sum/set.A_CFHTlens.sum()
-            # sigma_g
-            sigma_g[n_z_bin] = np.dot(gals['weight']**2., (e1**2. + e2**2.)/2.)/w2_sum
-            sigma_g[n_z_bin] = sigma_g[n_z_bin]**0.5
+            # Calculate quantities for each redshift bin and field
+            for count, f in enumerate(fields):
+                # Filter galaxies
+                sel = filter[f][n_z_bin]
+                gals = cat[sel]
+                pz_z = pz_full[sel]
+                # Get n_eff
+                area = get_area([f])
+                n_eff_f[count,n_z_bin] = get_n_eff(gals, area)
+                # Get sigma_g
+                sigma_g_f[count,n_z_bin] = get_sigma_g(gals)
+                # Get photo_z
+                photo_z_f[count,n_z_bin+1] = np.average(pz_z, weights=gals['weight'], axis=0)
+
 
             # Print progress message
             print '----> Completed bin {}'.format(n_z_bin+1)
             sys.stdout.flush()
 
-        # Save to file the map
+        # Save to file the results
         warning = io.write_to_fits(path['photo_z'], photo_z, 'PHOTO_Z', type='image') or warning
         warning = io.write_to_fits(path['photo_z'], n_eff, 'N_EFF', type='image') or warning
         warning = io.write_to_fits(path['photo_z'], sigma_g, 'SIGMA_G', type='image') or warning
+        warning = io.write_to_fits(path['photo_z'], photo_z_f, 'PHOTO_Z_PF', type='image') or warning
+        warning = io.write_to_fits(path['photo_z'], n_eff_f, 'N_EFF_PF', type='image') or warning
+        warning = io.write_to_fits(path['photo_z'], sigma_g_f, 'SIGMA_G_PF', type='image') or warning
 
         # Generate plots
         if args.want_plots:
@@ -568,12 +653,24 @@ def prep_fourier(args):
             plt.xlim(0.,2.)
             plt.xlabel('$z$', fontsize=14)
             plt.ylabel('Probability distribution', fontsize=14)
+            plt.title('Photo-z')
             plt.legend(loc="upper right", frameon = False, fontsize=9, labelspacing=0.01)
             plt.savefig(path['base']+'/photo_z.pdf')
             plt.close()
+            for n_f, f in enumerate(fields):
+                x = photo_z_f[n_f,0]
+                for count in range(1,photo_z_f.shape[1]):
+                    y = photo_z_f[n_f,count]
+                    plt.plot(x, y, label = 'Bin ' + str(count))
+                plt.xlim(0.,2.)
+                plt.xlabel('$z$', fontsize=14)
+                plt.ylabel('Probability distribution', fontsize=14)
+                plt.title('Photo-z {}'.format(f))
+                plt.legend(loc="upper right", frameon = False, fontsize=9, labelspacing=0.01)
+                plt.savefig(path['base']+'/photo_z_{}.pdf'.format(f))
+                plt.close()
 
         io.print_info_fits(path['photo_z'])
-
 
         return warning
 

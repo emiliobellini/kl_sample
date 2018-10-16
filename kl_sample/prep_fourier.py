@@ -467,7 +467,7 @@ def prep_fourier(args):
 
 # ------------------- Function to calculate the photo_z -----------------------#
 
-    def run_pz(path=path, z_bins=z_bins):
+    def run_pz(path=path, z_bins=z_bins, fields=fields):
 
         print 'Running PHOTO_Z module'
         sys.stdout.flush()
@@ -600,11 +600,9 @@ def prep_fourier(args):
             # Calculate quantities for each redshift bin
 
             # Merge filters
+            sel = np.zeros(len(cat),dtype=bool)
             for f in fields:
-                try:
-                    sel += filter[f][n_z_bin]
-                except:
-                    sel = filter[f][n_z_bin]
+                sel += filter[f][n_z_bin]
             # Filter galaxies
             gals = cat[sel]
             pz_z = pz_full[sel]
@@ -620,9 +618,8 @@ def prep_fourier(args):
             # Calculate quantities for each redshift bin and field
             for count, f in enumerate(fields):
                 # Filter galaxies
-                sel = filter[f][n_z_bin]
-                gals = cat[sel]
-                pz_z = pz_full[sel]
+                gals = cat[filter[f][n_z_bin]]
+                pz_z = pz_full[filter[f][n_z_bin]]
                 # Get n_eff
                 area = get_area([f])
                 n_eff_f[count,n_z_bin] = get_n_eff(gals, area)

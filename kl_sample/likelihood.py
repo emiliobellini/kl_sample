@@ -17,7 +17,6 @@ Functions:
 """
 
 import numpy as np
-import math
 import random
 import sys
 import cosmo as cosmo_tools
@@ -121,7 +120,7 @@ def compute_kl(cosmo, data, settings):
     S = cosmo_tools.get_cls_ccl(cosmo_ccl, data['photo_z'], settings['ell_max'])
 
     # Compute theory Noise and Cholesky decompose it (N=LL^+)
-    n_eff = data['n_eff']*(180.*60./math.pi)**2. #converted in stedrad^-1
+    n_eff = data['n_eff']*(180.*60./np.pi)**2. #converted in stedrad^-1
     sigma_g = data['sigma_g']
     N = np.array([np.diag(sigma_g**2/n_eff) for x in range(len(S))])
     L = np.linalg.cholesky(N)

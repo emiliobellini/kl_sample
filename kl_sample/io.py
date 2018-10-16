@@ -68,6 +68,8 @@ def argument_parser():
     prep_real_parser.add_argument('input_folder', type=str, help='Input folder')
     #Arguments for 'prep_fourier'
     prep_fourier_parser.add_argument('input_path', type=str, help='Input path (path/fname_)')
+    prep_fourier_parser.add_argument('--run_all', '-a', help='Run all routines '
+        'even if the files are already present', action='store_true')
     prep_fourier_parser.add_argument('--run_mask', '-mk', help='Run mask routine '
         'even if the files are already present', action='store_true')
     prep_fourier_parser.add_argument('--run_cat', '-c', help='Run catalogue routine '

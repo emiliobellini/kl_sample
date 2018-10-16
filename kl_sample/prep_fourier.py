@@ -71,19 +71,19 @@ def prep_fourier(args):
     # Determine which modules have to be run, by checking the existence of the
     # output files and arguments passed by the user
     is_run_mask = np.array([not(os.path.exists(path['mask_'+f])) for f in fields]).any()
-    if args.run_mask:
+    if args.run_mask or args.run_all:
         is_run_mask = True
     is_run_mult = np.array([not(os.path.exists(path['m_'+f])) for f in fields]).any()
-    if args.run_mult:
+    if args.run_mult or args.run_all:
         is_run_mult = True
     is_run_pz = not(os.path.exists(path['photo_z']))
-    if args.run_pz:
+    if args.run_pz or args.run_all:
         is_run_pz = True
     is_run_cat = np.array([not(os.path.exists(path['cat_'+f])) for f in fields]).any()
-    if args.run_cat:
+    if args.run_cat or args.run_all:
         is_run_cat = True
     is_run_map = np.array([not(os.path.exists(path['map_'+f])) for f in fields]).any()
-    if args.run_map:
+    if args.run_map or args.run_all:
         is_run_map = True
 
     # Check the existence of the required input files

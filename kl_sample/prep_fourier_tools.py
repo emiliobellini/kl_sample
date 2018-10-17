@@ -12,7 +12,7 @@ import sys
 import numpy as np
 
 
-def get_map(w, mask, cat):
+def get_map(w, mask, cat, pos_in=None):
     """ Generate a map from a catalogue, a mask
         and a WCS object.
 
@@ -31,10 +31,13 @@ def get_map(w, mask, cat):
     map_2 = np.zeros(mask.shape)
 
     # Get World position of each galaxy
-    pos = zip(cat['ALPHA_J2000'],cat['DELTA_J2000'])
-    # Calculate Pixel position of each galaxy
-    pos = w.wcs_world2pix(pos, 1).astype(int)
-    pos = np.flip(pos,axis=1) #Need to invert the columns
+    if pos is None :
+        pos = zip(cat['ALPHA_J2000'],cat['DELTA_J2000'])
+        # Calculate Pixel position of each galaxy
+        pos = w.wcs_world2pix(pos, 0).astype(int)
+        pos = np.flip(pos,axis=1) #Need to invert the columns
+    else :
+        pos = pos_in.copy()
 
     # Perform lex sort and get the sorted indices
     sorted_idx = np.lexsort(pos.T)
@@ -62,4 +65,4 @@ def get_map(w, mask, cat):
     print '----> Empty pixels: {0:5.2%}'.format(empty)
     sys.stdout.flush()
 
-    return map_1, map_2
+    return map_1, map_2, pos

@@ -48,7 +48,7 @@ def prep_fourier(args):
     # Size pixels masks in arcsecs (it has to be an integer number)
     size_pix = 120
     # Range of pixels used to average the multiplicative correction
-    n_avg_m = 5
+    n_avg_m = 2
 
 
 
@@ -303,6 +303,7 @@ def prep_fourier(args):
                 ends[-1] = mask_bad.shape[0]
                 for start, end in zip(starts, ends):
                     pos_bad = (start,0)+np.stack(np.where(mask_bad[start:end]<8192), axis=-1).astype(np.int32)
+                    pos_bad = np.flip(pos_bad,axis=1) #Need to invert the columns
                     pos_bad = w_bad.wcs_pix2world(pos_bad, 0).astype(np.float32)
                     pos_bad = np.around(w.wcs_world2pix(pos_bad, 0)).astype(np.int32)
                     pos_bad = np.flip(pos_bad,axis=1) #Need to invert the columns
@@ -816,7 +817,7 @@ def prep_fourier(args):
                         return True
 
                 # Get map
-                map_1, map_2 = tools.get_map(w, mask, cat)
+                map_1, map_2, _ = tools.get_map(w, mask, cat)
 
 
                 # Save to file the map

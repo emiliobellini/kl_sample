@@ -58,15 +58,15 @@ def prep_fourier(args):
     path = {}
     path['base'], path['fname'] = os.path.split(os.path.abspath(args.input_path))
     io.path_exists_or_error(path['base'])
-    path['cat_full'] = path['base']+'/'+path['fname']+'cat_full.fits'
-    path['mask_url'] = path['base']+'/mask_url.txt'
-    path['photo_z'] = path['base']+'/photo_z.fits'
+    path['cat_full'] = '{}/{}cat_full.fits'.format(path['base'],path['fname'])
+    path['mask_url'] = '{}/{}mask_url.txt'.format(path['base'],path['fname'])
+    path['photo_z'] = '{}/photo_z.fits'.format(path['base'])
     for f in fields:
-        path['cat_'+f] = path['base']+'/'+path['fname']+'cat_'+f+'.fits'
-        path['map_'+f] = path['base']+'/'+path['fname']+'map_'+f+'.fits'
-        path['mask_'+f] = path['base']+'/mask_'+f+'.fits'
-        path['m_'+f] = path['base']+'/mult_corr_'+f+'.fits'
-        path['mask_sec_'+f] = path['base']+'/mask_arcsec_'+f+'.fits.gz'
+        path['mask_sec_'+f] = '{}/{}mask_arcsec_{}.fits'.format(path['base'],path['fname'],f)
+        path['mask_'+f] = '{}/mask_{}.fits'.format(path['base'],f)
+        path['m_'+f] = '{}/{}mult_corr_{}.fits'.format(path['base'],path['fname'],f)
+        path['cat_'+f] = '{}/{}cat_{}.fits'.format(path['base'],path['fname'],f)
+        path['map_'+f] = '{}/{}map_{}.fits.gz'.format(path['base'],path['fname'],f)
 
     # Determine which modules have to be run, by checking the existence of the
     # output files and arguments passed by the user

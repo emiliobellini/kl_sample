@@ -66,7 +66,9 @@ def prep_fourier(args):
         path['mask_'+f] = '{}/mask_{}.fits'.format(path['base'],f)
         path['m_'+f] = '{}/{}mult_corr_{}.fits'.format(path['base'],path['fname'],f)
         path['cat_'+f] = '{}/{}cat_{}.fits'.format(path['base'],path['fname'],f)
-        path['map_'+f] = '{}/{}map_{}.fits.gz'.format(path['base'],path['fname'],f)
+        path['map_'+f] = '{}/{}map_{}.fits'.format(path['base'],path['fname'],f)
+        path['cl_'+f] = '{}/cl_{}.fits'.format(path['base'],f)
+        path['cl_noise_'+f] = '{}/cl_noise_{}.fits'.format(path['base'],f)
 
     # Determine which modules have to be run, by checking the existence of the
     # output files and arguments passed by the user
@@ -85,6 +87,12 @@ def prep_fourier(args):
     is_run_map = np.array([not(os.path.exists(path['map_'+f])) for f in fields]).any()
     if args.run_map or args.run_all:
         is_run_map = True
+    is_run_cl = np.array([not(os.path.exists(path['cl_'+f])) for f in fields]).any()
+    if args.run_cl or args.run_all:
+        is_run_cl = True
+    is_run_cl_noise = np.array([not(os.path.exists(path['cl_noise_'+f])) for f in fields]).any()
+    if args.run_cl_noise or args.run_all:
+        is_run_cl_noise = True
 
     # Check the existence of the required input files
     if is_run_mask:
@@ -143,6 +151,28 @@ def prep_fourier(args):
             warning = True
     else:
         print 'I will skip the MAP module. Output files already there!'
+        sys.stdout.flush()
+    if is_run_cl:
+        nofile1 = np.array([not(os.path.exists(path['mask_'+f])) for f in fields]).any()
+        nofile2 = np.array([not(os.path.exists(path['map_'+f])) for f in fields]).any()
+        if (not(is_run_mask) and nofile1) or (not(is_run_map) and nofile2):
+            print 'WARNING: I will skip the CL module. Input files not found!'
+            sys.stdout.flush()
+            is_run_cl = False
+            warning = True
+    else:
+        print 'I will skip the CL module. Output files already there!'
+        sys.stdout.flush()
+    if is_run_cl_noise:
+        nofile1 = np.array([not(os.path.exists(path['mask_'+f])) for f in fields]).any()
+        nofile2 = np.array([not(os.path.exists(path['cat_'+f])) for f in fields]).any()
+        if (not(is_run_mask) and nofile1) or (not(is_run_cat) and nofile2):
+            print 'WARNING: I will skip the CL_NOISE module. Input files not found!'
+            sys.stdout.flush()
+            is_run_cl_noise = False
+            warning = True
+    else:
+        print 'I will skip the CL_NOISE module. Output files already there!'
         sys.stdout.flush()
 
 
@@ -843,6 +873,172 @@ def prep_fourier(args):
 
 
 
+# ------------------- Function to calculate the cl ----------------------------#
+
+    def run_cl(path=path, fields=fields, z_bins=z_bins):
+
+        print 'Running CL module'
+        sys.stdout.flush()
+        warning = False
+
+
+        # # First loop: scan over the fields
+        # for f in fields:
+        #
+        #     # Remove old output file to avoid confusion
+        #     try:
+        #         os.remove(path['map_'+f])
+        #     except:
+        #         pass
+        #
+        #     # Read mask and create WCS object
+        #     imname = 'MASK_{}'.format(f)
+        #     fname = path['mask_'+f]
+        #     try:
+        #         mask = io.read_from_fits(fname, imname)
+        #         hd = io.read_header_from_fits(fname, imname)
+        #     except KeyError:
+        #         print 'WARNING: No key '+imname+' in '+fname+'. Skipping calculation!'
+        #         sys.stdout.flush()
+        #         return True
+        #     # Create a new WCS object
+        #     w = wcs.WCS(hd)
+        #
+        #     # Second loop: divide galaxies in redshift bins
+        #     for n_z_bin, z_bin in enumerate(z_bins):
+        #
+        #         print 'Calculating map for field ' + f + ' and bin {}:'.format(n_z_bin+1)
+        #         sys.stdout.flush()
+        #
+        #
+        #         # Read galaxy catalogue
+        #         tabname = 'CAT_{}_Z{}'.format(f, n_z_bin+1)
+        #         fname = path['cat_'+f]
+        #         try:
+        #             cat = io.read_from_fits(fname, tabname)
+        #         except KeyError:
+        #             print 'WARNING: No key '+tabname+' in '+fname+'. Skipping calculation!'
+        #             sys.stdout.flush()
+        #             return True
+        #
+        #         # Check that the table has the correct columns
+        #         table_keys = ['ALPHA_J2000', 'DELTA_J2000', 'e1', 'e2', 'weight']
+        #         for key in table_keys:
+        #             if key not in cat.columns.names:
+        #                 print 'WARNING: No key '+key+' in table of '+fname+'. Skipping calculation!'
+        #                 sys.stdout.flush()
+        #                 return True
+        #
+        #         # Get map
+        #         map_1, map_2, _ = tools.get_map(w, mask, cat)
+        #
+        #
+        #         # Save to file the map
+        #         name = 'MAP_{}_Z{}_G1'.format(f, n_z_bin+1)
+        #         warning = io.write_to_fits(path['map_'+f], map_1, name, header=hd, type='image') or warning
+        #         name = 'MAP_{}_Z{}_G2'.format(f, n_z_bin+1)
+        #         warning = io.write_to_fits(path['map_'+f], map_2, name, header=hd, type='image') or warning
+        #
+        #         # Generate plots
+        #         if args.want_plots:
+        #             plt.imshow(map_1,interpolation='nearest')
+        #             plt.colorbar()
+        #             plt.savefig(path['base']+'/'+path['fname']+'map_{}_z{}_g1.pdf'.format(f, n_z_bin+1))
+        #             plt.close()
+        #             plt.imshow(map_2,interpolation='nearest')
+        #             plt.colorbar()
+        #             plt.savefig(path['base']+'/'+path['fname']+'map_{}_z{}_g2.pdf'.format(f, n_z_bin+1))
+        #             plt.close()
+        #
+        #     io.print_info_fits(path['map_'+f])
+
+        return warning
+
+
+
+# ------------------- Function to calculate the cl ----------------------------#
+
+    def run_cl_noise(path=path, fields=fields, z_bins=z_bins):
+
+        print 'Running CL_NOISE module'
+        sys.stdout.flush()
+        warning = False
+
+
+        # # First loop: scan over the fields
+        # for f in fields:
+        #
+        #     # Remove old output file to avoid confusion
+        #     try:
+        #         os.remove(path['map_'+f])
+        #     except:
+        #         pass
+        #
+        #     # Read mask and create WCS object
+        #     imname = 'MASK_{}'.format(f)
+        #     fname = path['mask_'+f]
+        #     try:
+        #         mask = io.read_from_fits(fname, imname)
+        #         hd = io.read_header_from_fits(fname, imname)
+        #     except KeyError:
+        #         print 'WARNING: No key '+imname+' in '+fname+'. Skipping calculation!'
+        #         sys.stdout.flush()
+        #         return True
+        #     # Create a new WCS object
+        #     w = wcs.WCS(hd)
+        #
+        #     # Second loop: divide galaxies in redshift bins
+        #     for n_z_bin, z_bin in enumerate(z_bins):
+        #
+        #         print 'Calculating map for field ' + f + ' and bin {}:'.format(n_z_bin+1)
+        #         sys.stdout.flush()
+        #
+        #
+        #         # Read galaxy catalogue
+        #         tabname = 'CAT_{}_Z{}'.format(f, n_z_bin+1)
+        #         fname = path['cat_'+f]
+        #         try:
+        #             cat = io.read_from_fits(fname, tabname)
+        #         except KeyError:
+        #             print 'WARNING: No key '+tabname+' in '+fname+'. Skipping calculation!'
+        #             sys.stdout.flush()
+        #             return True
+        #
+        #         # Check that the table has the correct columns
+        #         table_keys = ['ALPHA_J2000', 'DELTA_J2000', 'e1', 'e2', 'weight']
+        #         for key in table_keys:
+        #             if key not in cat.columns.names:
+        #                 print 'WARNING: No key '+key+' in table of '+fname+'. Skipping calculation!'
+        #                 sys.stdout.flush()
+        #                 return True
+        #
+        #         # Get map
+        #         map_1, map_2, _ = tools.get_map(w, mask, cat)
+        #
+        #
+        #         # Save to file the map
+        #         name = 'MAP_{}_Z{}_G1'.format(f, n_z_bin+1)
+        #         warning = io.write_to_fits(path['map_'+f], map_1, name, header=hd, type='image') or warning
+        #         name = 'MAP_{}_Z{}_G2'.format(f, n_z_bin+1)
+        #         warning = io.write_to_fits(path['map_'+f], map_2, name, header=hd, type='image') or warning
+        #
+        #         # Generate plots
+        #         if args.want_plots:
+        #             plt.imshow(map_1,interpolation='nearest')
+        #             plt.colorbar()
+        #             plt.savefig(path['base']+'/'+path['fname']+'map_{}_z{}_g1.pdf'.format(f, n_z_bin+1))
+        #             plt.close()
+        #             plt.imshow(map_2,interpolation='nearest')
+        #             plt.colorbar()
+        #             plt.savefig(path['base']+'/'+path['fname']+'map_{}_z{}_g2.pdf'.format(f, n_z_bin+1))
+        #             plt.close()
+        #
+        #     io.print_info_fits(path['map_'+f])
+
+        return warning
+
+
+
 # ------------------- Pipeline ------------------------------------------------#
 
     if is_run_mask:
@@ -884,6 +1080,22 @@ def prep_fourier(args):
         hrs, rem = divmod(end-start, 3600)
         mins, secs = divmod(rem, 60)
         print 'Run MAP module in {:0>2} Hours {:0>2} Minutes {:05.2f} Seconds!'.format(int(hrs),int(mins),secs)
+        sys.stdout.flush()
+    if is_run_cl:
+        start = time.clock()
+        warning = run_cl() or warning
+        end = time.clock()
+        hrs, rem = divmod(end-start, 3600)
+        mins, secs = divmod(rem, 60)
+        print 'Run CL module in {:0>2} Hours {:0>2} Minutes {:05.2f} Seconds!'.format(int(hrs),int(mins),secs)
+        sys.stdout.flush()
+    if is_run_cl_noise:
+        start = time.clock()
+        warning = run_cl_noise() or warning
+        end = time.clock()
+        hrs, rem = divmod(end-start, 3600)
+        mins, secs = divmod(rem, 60)
+        print 'Run CL_NOISE module in {:0>2} Hours {:0>2} Minutes {:05.2f} Seconds!'.format(int(hrs),int(mins),secs)
         sys.stdout.flush()
 
     if warning:

@@ -31,12 +31,12 @@ def get_map(w, mask, cat, pos_in=None):
     map_2 = np.zeros(mask.shape)
 
     # Get World position of each galaxy
-    if pos is None :
+    if pos_in is None:
         pos = zip(cat['ALPHA_J2000'],cat['DELTA_J2000'])
         # Calculate Pixel position of each galaxy
         pos = w.wcs_world2pix(pos, 0).astype(int)
         pos = np.flip(pos,axis=1) #Need to invert the columns
-    else :
+    else:
         pos = pos_in.copy()
 
     # Perform lex sort and get the sorted indices

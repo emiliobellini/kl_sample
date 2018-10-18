@@ -49,6 +49,14 @@ def prep_fourier(args):
     size_pix = 120
     # Range of pixels used to average the multiplicative correction
     n_avg_m = 2
+    # Bandpowers to calculate Cl's
+    bandpowers = np.array([[  30,   80],
+                           [  80,  260],
+                           [ 260,  450],
+                           [ 450,  670],
+                           [ 670, 1310],
+                           [1310, 2300],
+                           [2300, 5100]])
 
 
 
@@ -875,71 +883,59 @@ def prep_fourier(args):
 
 # ------------------- Function to calculate the cl ----------------------------#
 
-    def run_cl(path=path, fields=fields, z_bins=z_bins):
+    def run_cl(path=path, fields=fields, z_bins=z_bins, bp=bandpowers):
 
         print 'Running CL module'
         sys.stdout.flush()
         warning = False
 
 
-        # # First loop: scan over the fields
-        # for f in fields:
-        #
-        #     # Remove old output file to avoid confusion
-        #     try:
-        #         os.remove(path['map_'+f])
-        #     except:
-        #         pass
-        #
-        #     # Read mask and create WCS object
-        #     imname = 'MASK_{}'.format(f)
-        #     fname = path['mask_'+f]
-        #     try:
-        #         mask = io.read_from_fits(fname, imname)
-        #         hd = io.read_header_from_fits(fname, imname)
-        #     except KeyError:
-        #         print 'WARNING: No key '+imname+' in '+fname+'. Skipping calculation!'
-        #         sys.stdout.flush()
-        #         return True
-        #     # Create a new WCS object
-        #     w = wcs.WCS(hd)
-        #
-        #     # Second loop: divide galaxies in redshift bins
-        #     for n_z_bin, z_bin in enumerate(z_bins):
-        #
-        #         print 'Calculating map for field ' + f + ' and bin {}:'.format(n_z_bin+1)
-        #         sys.stdout.flush()
-        #
-        #
-        #         # Read galaxy catalogue
-        #         tabname = 'CAT_{}_Z{}'.format(f, n_z_bin+1)
-        #         fname = path['cat_'+f]
-        #         try:
-        #             cat = io.read_from_fits(fname, tabname)
-        #         except KeyError:
-        #             print 'WARNING: No key '+tabname+' in '+fname+'. Skipping calculation!'
-        #             sys.stdout.flush()
-        #             return True
-        #
-        #         # Check that the table has the correct columns
-        #         table_keys = ['ALPHA_J2000', 'DELTA_J2000', 'e1', 'e2', 'weight']
-        #         for key in table_keys:
-        #             if key not in cat.columns.names:
-        #                 print 'WARNING: No key '+key+' in table of '+fname+'. Skipping calculation!'
-        #                 sys.stdout.flush()
-        #                 return True
-        #
-        #         # Get map
-        #         map_1, map_2, _ = tools.get_map(w, mask, cat)
-        #
-        #
-        #         # Save to file the map
-        #         name = 'MAP_{}_Z{}_G1'.format(f, n_z_bin+1)
-        #         warning = io.write_to_fits(path['map_'+f], map_1, name, header=hd, type='image') or warning
-        #         name = 'MAP_{}_Z{}_G2'.format(f, n_z_bin+1)
-        #         warning = io.write_to_fits(path['map_'+f], map_2, name, header=hd, type='image') or warning
-        #
-        #         # Generate plots
+        # First loop: scan over the fields
+        for f in fields:
+
+            print 'Calculating cl for field {}:'.format(f,)
+            sys.stdout.flush()
+
+            # Remove old output file to avoid confusion
+            try:
+                os.remove(path['cl_'+f])
+            except:
+                pass
+
+            # Read mask
+            imname = 'MASK_{}'.format(f)
+            fname = path['mask_'+f]
+            try:
+                mask = io.read_from_fits(fname, imname)
+                hd = io.read_header_from_fits(fname, imname)
+            except KeyError:
+                print 'WARNING: No key '+imname+' in '+fname+'. Skipping calculation!'
+                sys.stdout.flush()
+                return True
+
+            # Read maps
+            fname = path['map_'+f]
+            n_pol = 2 # Number of shear polarizations (always 2)
+            map = np.zeros((len(z_bins),n_pol)+(mask.shape))
+            # Get maps for each bin and polarization
+            for n_z_bin, z_bin in enumerate(z_bins):
+                for count in range(n_pol):
+                    t = 'MAP_{}_Z{}_G{}'.format(f, n_z_bin+1,count+1)
+                    try:
+                        map[n_z_bin,count] = io.read_from_fits(fname, t)
+                    except KeyError:
+                        print 'WARNING: No key '+t+' in '+fname+'. Skipping calculation!'
+                        sys.stdout.flush()
+                        return True
+
+            # Get map
+            cl, _ = tools.get_cl(bp, mask, map)
+
+            # Save to file the map
+            name = 'CL_{}'.format(f)
+            warning = io.write_to_fits(path['cl_'+f], cl, name, type='image') or warning
+
+        #         # Generate plots #TODO
         #         if args.want_plots:
         #             plt.imshow(map_1,interpolation='nearest')
         #             plt.colorbar()
@@ -950,7 +946,7 @@ def prep_fourier(args):
         #             plt.savefig(path['base']+'/'+path['fname']+'map_{}_z{}_g2.pdf'.format(f, n_z_bin+1))
         #             plt.close()
         #
-        #     io.print_info_fits(path['map_'+f])
+            io.print_info_fits(path['cl_'+f])
 
         return warning
 

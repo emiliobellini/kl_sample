@@ -20,9 +20,11 @@ def get_map(w, mask, cat, pos_in=None):
         w: WCS object.
         mask: array with mask.
         cat: catalogue of objects.
+        pos_in: to save cpu time it is possible to provide pixel positions.
 
     Returns:
-        map: array with map.
+        map_1, map_2: array with maps for each polarization.
+        pos: pixel positions.
 
     """
 
@@ -66,3 +68,30 @@ def get_map(w, mask, cat, pos_in=None):
     sys.stdout.flush()
 
     return map_1, map_2, pos
+
+
+def get_cl(bp, mask, map, keep_mcm=False):
+    """ Generate cl's from a mask and a map.
+
+    Args:
+        bp: bandpowers for ell.
+        mask: array with mask.
+        map: maps for each bin and polarization.
+        keep_mcm: to save cpu time it is possible to save to file the mode coupling matrix.
+
+    Returns:
+        cl: array with cl (E/B, bins, ell).
+        mcm_path: path to the mode coupling matrix.
+
+    """
+
+    print bp
+    print mask
+    print map
+
+
+
+    cl = np.zeros(5)
+    mcm_path = 0.
+
+    return cl, mcm_path

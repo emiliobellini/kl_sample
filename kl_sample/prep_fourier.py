@@ -70,8 +70,9 @@ def prep_fourier(args):
     path['mask_url'] = '{}/{}mask_url.txt'.format(path['base'],path['fname'])
     path['photo_z'] = '{}/photo_z.fits'.format(path['base'])
     for f in fields:
-        path['mask_sec_'+f] = '{}/{}mask_arcsec_{}.fits'.format(path['base'],path['fname'],f)
+        path['mask_sec_'+f] = '{}/{}mask_arcsec_{}.fits.gz'.format(path['base'],path['fname'],f)
         path['mask_'+f] = '{}/mask_{}.fits'.format(path['base'],f)
+        path['mask_now_'+f] = '{}/mask_noweight_{}.fits'.format(path['base'],f)
         path['m_'+f] = '{}/{}mult_corr_{}.fits'.format(path['base'],path['fname'],f)
         path['cat_'+f] = '{}/{}cat_{}.fits'.format(path['base'],path['fname'],f)
         path['map_'+f] = '{}/{}map_{}.fits'.format(path['base'],path['fname'],f)
@@ -220,6 +221,7 @@ def prep_fourier(args):
             # Remove old output file to avoid confusion
             try:
                 os.remove(path['mask_'+f])
+                os.remove(path['mask_now_'+f])
             except:
                 pass
 
@@ -370,17 +372,69 @@ def prep_fourier(args):
 
             # Save to file the mask
             name = 'MASK_{}'.format(f)
-            warning = io.write_to_fits(path['mask_'+f], mask, name, header=hd, type='image') or warning
+            warning = io.write_to_fits(path['mask_now_'+f], mask, name, header=hd, type='image') or warning
 
-            io.print_info_fits(path['mask_'+f])
+            io.print_info_fits(path['mask_now_'+f])
 
             # Generate plots
             if args.want_plots:
                 plt.imshow(mask,interpolation='nearest')
                 plt.colorbar()
-                plt.savefig(path['base']+'/mask_'+f+'.pdf')
+                plt.savefig(path['base']+'/mask_noweight_{}.pdf'.format(f))
                 plt.close()
 
+
+            imname = 'MASK_{}'.format(f)
+            fname = path['mask_now_'+f]
+            mask = io.read_from_fits(fname, imname)
+            hd = io.read_header_from_fits(fname, imname)
+            w = wcs.WCS(hd)
+
+            # Second loop: calculate mask of weights
+            mask = mask.astype(bool).astype(np.int8)
+            for n_z_bin, z_bin in enumerate(z_bins):
+                # Create an empty array for the weight mask
+                weights_mask = np.zeros(mask.shape)
+
+                # Filter galaxies
+                sel = cat['Z_B']>=z_bin[0]
+                sel = (cat['Z_B']<z_bin[1])*sel
+                sel = (cat['weight']>0.)*sel
+                sel = np.array([x[:2] in f for x in cat['id']])*sel
+                gals = cat[sel]
+                # Get World position of each galaxy
+                pos = zip(gals['ALPHA_J2000'],gals['DELTA_J2000'])
+                # Calculate Pixel position of each galaxy
+                pos = w.wcs_world2pix(pos, 0).astype(int)
+                pos = np.flip(pos,axis=1) #Need to invert the columns
+                # Pixels where at least one galaxy has been found
+                pos_unique = np.unique(pos, axis=0)
+                # Scan over the populated pixels
+                for count, pix in enumerate(pos_unique):
+                    # Select galaxies in range of pixels
+                    sel = pos[:,0] == pix[0]
+                    sel = (pos[:,1] == pix[1])*sel
+                    weight = gals[sel]['weight']
+                    weights_mask[tuple(pix)] = np.average(weight)
+
+                # Get final mask
+                weights_mask = weights_mask*mask
+
+                # Save to file the mask
+                name = 'MASK_{}_Z{}'.format(f, n_z_bin+1)
+                warning = io.write_to_fits(path['mask_'+f], weights_mask, name, header=hd, type='image') or warning
+
+                print '----> Created mask for field {} and bin {}'.format(f,n_z_bin+1)
+                sys.stdout.flush()
+
+                # Generate plots
+                if args.want_plots:
+                    plt.imshow(weights_mask,interpolation='nearest')
+                    plt.colorbar()
+                    plt.savefig(path['base']+'/mask_{}_z{}.pdf'.format(f,n_z_bin+1))
+                    plt.close()
+
+            io.print_info_fits(path['mask_'+f])
 
         return warning
 
@@ -490,12 +544,12 @@ def prep_fourier(args):
                 name = 'MULT_CORR_{}_Z{}'.format(f, n_z_bin+1)
                 warning = io.write_to_fits(path['m_'+f], mult_corr, name, header=hd, type='image') or warning
 
-                # # Generate plots
-                # if args.want_plots:
-                #     plt.imshow(mult_corr,interpolation='nearest')
-                #     plt.colorbar()
-                #     plt.savefig(path['base']+'/'+path['fname']+'mult_corr_{}_z{}.pdf'.format(f, n_z_bin+1))
-                #     plt.close()
+                # Generate plots
+                if args.want_plots:
+                    plt.imshow(mult_corr,interpolation='nearest')
+                    plt.colorbar()
+                    plt.savefig(path['base']+'/'+path['fname']+'mult_corr_{}_z{}.pdf'.format(f, n_z_bin+1))
+                    plt.close()
 
             io.print_info_fits(path['m_'+f])
 
@@ -1053,7 +1107,7 @@ def prep_fourier(args):
 
     if is_run_mask:
         start = time.clock()
-        warning = run_mask() or warning
+        warning = run_mask(fields=['W2']) or warning
         end = time.clock()
         hrs, rem = divmod(end-start, 3600)
         mins, secs = divmod(rem, 60)

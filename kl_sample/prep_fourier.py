@@ -384,12 +384,6 @@ def prep_fourier(args):
                 plt.close()
 
 
-            imname = 'MASK_{}'.format(f)
-            fname = path['mask_now_'+f]
-            mask = io.read_from_fits(fname, imname)
-            hd = io.read_header_from_fits(fname, imname)
-            w = wcs.WCS(hd)
-
             # Second loop: calculate mask of weights
             mask = mask.astype(bool).astype(np.int8)
             for n_z_bin, z_bin in enumerate(z_bins):
@@ -477,25 +471,25 @@ def prep_fourier(args):
             except:
                 pass
 
-            # Read mask and create WCS object
-            imname = 'MASK_{}'.format(f)
-            fname = path['mask_'+f]
-            try:
-                mask = io.read_from_fits(fname, imname)
-                hd = io.read_header_from_fits(fname, imname)
-            except KeyError:
-                print 'WARNING: No key '+imname+' in '+fname+'. Skipping calculation!'
-                sys.stdout.flush()
-                return True
-            # Create a new WCS object
-            w = wcs.WCS(hd)
-
             # Second loop: divide galaxies in redshift bins
             for n_z_bin, z_bin in enumerate(z_bins):
 
                 print 'Calculating multiplicative correction for field ' + f + ' and bin {}:'.format(n_z_bin+1)
                 sys.stdout.flush()
 
+
+                # Read mask and create WCS object
+                imname = 'MASK_{}_Z{}'.format(f,n_z_bin+1)
+                fname = path['mask_'+f]
+                try:
+                    mask = io.read_from_fits(fname, imname)
+                    hd = io.read_header_from_fits(fname, imname)
+                except KeyError:
+                    print 'WARNING: No key '+imname+' in '+fname+'. Skipping calculation!'
+                    sys.stdout.flush()
+                    return True
+                # Create a new WCS object
+                w = wcs.WCS(hd)
 
                 # Create an empty array for the multiplicative correction
                 mult_corr = np.zeros(mask.shape)
@@ -870,25 +864,25 @@ def prep_fourier(args):
             except:
                 pass
 
-            # Read mask and create WCS object
-            imname = 'MASK_{}'.format(f)
-            fname = path['mask_'+f]
-            try:
-                mask = io.read_from_fits(fname, imname)
-                hd = io.read_header_from_fits(fname, imname)
-            except KeyError:
-                print 'WARNING: No key '+imname+' in '+fname+'. Skipping calculation!'
-                sys.stdout.flush()
-                return True
-            # Create a new WCS object
-            w = wcs.WCS(hd)
-
             # Second loop: divide galaxies in redshift bins
             for n_z_bin, z_bin in enumerate(z_bins):
 
                 print 'Calculating map for field ' + f + ' and bin {}:'.format(n_z_bin+1)
                 sys.stdout.flush()
 
+
+                # Read mask and create WCS object
+                imname = 'MASK_{}_Z{}'.format(f,n_z_bin+1)
+                fname = path['mask_'+f]
+                try:
+                    mask = io.read_from_fits(fname, imname)
+                    hd = io.read_header_from_fits(fname, imname)
+                except KeyError:
+                    print 'WARNING: No key '+imname+' in '+fname+'. Skipping calculation!'
+                    sys.stdout.flush()
+                    return True
+                # Create a new WCS object
+                w = wcs.WCS(hd)
 
                 # Read galaxy catalogue
                 tabname = 'CAT_{}_Z{}'.format(f, n_z_bin+1)
@@ -957,20 +951,25 @@ def prep_fourier(args):
                 pass
 
             # Read mask
-            imname = 'MASK_{}'.format(f)
             fname = path['mask_'+f]
-            try:
-                mask = io.read_from_fits(fname, imname)
-                hd = io.read_header_from_fits(fname, imname)
-            except KeyError:
-                print 'WARNING: No key '+imname+' in '+fname+'. Skipping calculation!'
-                sys.stdout.flush()
-                return True
+            # Get masks for each bin
+            for n_z_bin, z_bin in enumerate(z_bins):
+                t = 'MASK_{}_Z{}'.format(f, n_z_bin+1)
+                try:
+                    mask[n_z_bin] = io.read_from_fits(fname, t)
+                except UnboundLocalError:
+                    mask_tmp = io.read_from_fits(fname, t)
+                    mask = np.zeros((len(z_bins))+(mask_tmp.shape))
+                    mask[n_z_bin] = mask_tmp
+                except KeyError:
+                    print 'WARNING: No key '+t+' in '+fname+'. Skipping calculation!'
+                    sys.stdout.flush()
+                    return True
 
             # Read maps
             fname = path['map_'+f]
             n_pols = 2 # Number of shear polarizations (always 2)
-            map = np.zeros((n_pols,len(z_bins))+(mask.shape))
+            map = np.zeros((n_pols)+(mask.shape))
             # Get maps for each polarization and bin
             for count in range(n_pols):
                 for n_z_bin, z_bin in enumerate(z_bins):
@@ -1105,49 +1104,49 @@ def prep_fourier(args):
 
 # ------------------- Pipeline ------------------------------------------------#
 
-    if is_run_mask:
-        start = time.clock()
-        warning = run_mask(fields=['W2']) or warning
-        end = time.clock()
-        hrs, rem = divmod(end-start, 3600)
-        mins, secs = divmod(rem, 60)
-        print 'Run MASK module in {:0>2} Hours {:0>2} Minutes {:05.2f} Seconds!'.format(int(hrs),int(mins),secs)
-        sys.stdout.flush()
-    if is_run_mult:
-        start = time.clock()
-        warning = run_mult() or warning
-        end = time.clock()
-        hrs, rem = divmod(end-start, 3600)
-        mins, secs = divmod(rem, 60)
-        print 'Run MULT_CORR module in {:0>2} Hours {:0>2} Minutes {:05.2f} Seconds!'.format(int(hrs),int(mins),secs)
-        sys.stdout.flush()
-    if is_run_pz:
-        start = time.clock()
-        warning = run_pz() or warning
-        end = time.clock()
-        hrs, rem = divmod(end-start, 3600)
-        mins, secs = divmod(rem, 60)
-        print 'Run PHOTO_Z module in {:0>2} Hours {:0>2} Minutes {:05.2f} Seconds!'.format(int(hrs),int(mins),secs)
-        sys.stdout.flush()
-    if is_run_cat:
-        start = time.clock()
-        warning = run_cat() or warning
-        end = time.clock()
-        hrs, rem = divmod(end-start, 3600)
-        mins, secs = divmod(rem, 60)
-        print 'Run CATALOGUE module in {:0>2} Hours {:0>2} Minutes {:05.2f} Seconds!'.format(int(hrs),int(mins),secs)
-        sys.stdout.flush()
-    if is_run_map:
-        start = time.clock()
-        warning = run_map() or warning
-        end = time.clock()
-        hrs, rem = divmod(end-start, 3600)
-        mins, secs = divmod(rem, 60)
-        print 'Run MAP module in {:0>2} Hours {:0>2} Minutes {:05.2f} Seconds!'.format(int(hrs),int(mins),secs)
-        sys.stdout.flush()
+    # if is_run_mask:
+    #     start = time.clock()
+    #     warning = run_mask() or warning
+    #     end = time.clock()
+    #     hrs, rem = divmod(end-start, 3600)
+    #     mins, secs = divmod(rem, 60)
+    #     print 'Run MASK module in {:0>2} Hours {:0>2} Minutes {:05.2f} Seconds!'.format(int(hrs),int(mins),secs)
+    #     sys.stdout.flush()
+    # if is_run_mult:
+    #     start = time.clock()
+    #     warning = run_mult() or warning
+    #     end = time.clock()
+    #     hrs, rem = divmod(end-start, 3600)
+    #     mins, secs = divmod(rem, 60)
+    #     print 'Run MULT_CORR module in {:0>2} Hours {:0>2} Minutes {:05.2f} Seconds!'.format(int(hrs),int(mins),secs)
+    #     sys.stdout.flush()
+    # if is_run_pz:
+    #     start = time.clock()
+    #     warning = run_pz() or warning
+    #     end = time.clock()
+    #     hrs, rem = divmod(end-start, 3600)
+    #     mins, secs = divmod(rem, 60)
+    #     print 'Run PHOTO_Z module in {:0>2} Hours {:0>2} Minutes {:05.2f} Seconds!'.format(int(hrs),int(mins),secs)
+    #     sys.stdout.flush()
+    # if is_run_cat:
+    #     start = time.clock()
+    #     warning = run_cat() or warning
+    #     end = time.clock()
+    #     hrs, rem = divmod(end-start, 3600)
+    #     mins, secs = divmod(rem, 60)
+    #     print 'Run CATALOGUE module in {:0>2} Hours {:0>2} Minutes {:05.2f} Seconds!'.format(int(hrs),int(mins),secs)
+    #     sys.stdout.flush()
+    # if is_run_map:
+    #     start = time.clock()
+    #     warning = run_map() or warning
+    #     end = time.clock()
+    #     hrs, rem = divmod(end-start, 3600)
+    #     mins, secs = divmod(rem, 60)
+    #     print 'Run MAP module in {:0>2} Hours {:0>2} Minutes {:05.2f} Seconds!'.format(int(hrs),int(mins),secs)
+    #     sys.stdout.flush()
     if is_run_cl:
         start = time.clock()
-        warning = run_cl() or warning
+        warning = run_cl(fields=['W3']) or warning
         end = time.clock()
         hrs, rem = divmod(end-start, 3600)
         mins, secs = divmod(rem, 60)

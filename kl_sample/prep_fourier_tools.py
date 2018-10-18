@@ -103,7 +103,7 @@ def get_cl(field, bp, hd, mask, map):
     # Fields definition
     f = {}
     for n_bin in range(n_bins):
-        f[n_bin+1] = nmt.NmtFieldFlat(Lx,Ly,mask,[map[0,n_bin],-map[1,n_bin]]) # Hardcoded n_pols=2
+        f[n_bin+1] = nmt.NmtFieldFlat(Lx,Ly,mask[n_bin],[map[0,n_bin],-map[1,n_bin]]) # Hardcoded n_pols=2
     # Bins for flat sky fields
     b = nmt.NmtBinFlat(bp[:,0],bp[:,1])
     # Effective ells

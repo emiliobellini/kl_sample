@@ -893,7 +893,7 @@ def prep_fourier(args):
         # First loop: scan over the fields
         for f in fields:
 
-            print 'Calculating cl for field {}:'.format(f,)
+            print 'Calculating cl for field {}:'.format(f)
             sys.stdout.flush()
 
             # Remove old output file to avoid confusion
@@ -915,37 +915,51 @@ def prep_fourier(args):
 
             # Read maps
             fname = path['map_'+f]
-            n_pol = 2 # Number of shear polarizations (always 2)
-            map = np.zeros((len(z_bins),n_pol)+(mask.shape))
-            # Get maps for each bin and polarization
-            for n_z_bin, z_bin in enumerate(z_bins):
-                for count in range(n_pol):
+            n_pols = 2 # Number of shear polarizations (always 2)
+            map = np.zeros((n_pols,len(z_bins))+(mask.shape))
+            # Get maps for each polarization and bin
+            for count in range(n_pols):
+                for n_z_bin, z_bin in enumerate(z_bins):
                     t = 'MAP_{}_Z{}_G{}'.format(f, n_z_bin+1,count+1)
                     try:
-                        map[n_z_bin,count] = io.read_from_fits(fname, t)
+                        map[count,n_z_bin] = io.read_from_fits(fname, t)
                     except KeyError:
                         print 'WARNING: No key '+t+' in '+fname+'. Skipping calculation!'
                         sys.stdout.flush()
                         return True
 
-            # Get map
-            cl, _ = tools.get_cl(bp, mask, map)
+            # Get Cl's
+            ell, cl, tmp_files = tools.get_cl(f, bp, hd, mask, map)
+            [os.remove(x) for x in tmp_files] # Remove tmp files
 
             # Save to file the map
+            name = 'ELL_{}'.format(f)
+            warning = io.write_to_fits(path['cl_'+f], ell, name, type='image') or warning
             name = 'CL_{}'.format(f)
             warning = io.write_to_fits(path['cl_'+f], cl, name, type='image') or warning
 
-        #         # Generate plots #TODO
-        #         if args.want_plots:
-        #             plt.imshow(map_1,interpolation='nearest')
-        #             plt.colorbar()
-        #             plt.savefig(path['base']+'/'+path['fname']+'map_{}_z{}_g1.pdf'.format(f, n_z_bin+1))
-        #             plt.close()
-        #             plt.imshow(map_2,interpolation='nearest')
-        #             plt.colorbar()
-        #             plt.savefig(path['base']+'/'+path['fname']+'map_{}_z{}_g2.pdf'.format(f, n_z_bin+1))
-        #             plt.close()
-        #
+            # Generate plots
+            if args.want_plots:
+                factor = ell*(ell+1.)/(2.*np.pi)
+                x = ell
+                for nb1 in range(len(z_bins)):
+                    for nb2 in range(nb1,len(z_bins)):
+                        ax = plt.gca()
+                        for ng1 in range(n_pols):
+                            for ng2 in range(ng1,n_pols):
+                                y = factor*cl[ng1,ng2,nb1,nb2]
+                                color = next(ax._get_lines.prop_cycler)['color']
+                                plt.plot(x, y,'o',label='$C_l^{{{}{}}}$'.format(ng1+1,ng2+1), color = color)
+                                plt.plot(x, -y,'*', color = color)
+                        plt.title('Z = {}{}'.format(nb1+1,nb2+1))
+                        plt.xscale('log')
+                        plt.yscale('log')
+                        plt.xlabel('$\\ell$')
+                        plt.ylabel('$\\ell(\\ell+1)C_\\ell/2\\pi$')
+                        plt.legend(loc='best')
+                        plt.savefig('{}/{}cl_{}_z{}{}.pdf'.format(path['base'],path['fname'],f,nb1+1,nb2+1))
+                        plt.close()
+
             io.print_info_fits(path['cl_'+f])
 
         return warning

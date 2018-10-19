@@ -571,18 +571,21 @@ def prep_fourier(args):
         mask = {}
         w = {}
         for f in fields:
-            # Read mask and create WCS object
-            imname = 'MASK_{}'.format(f)
-            fname = path['mask_'+f]
-            try:
-                mask[f] = io.read_from_fits(fname, imname)
-                hd = io.read_header_from_fits(fname, imname)
-            except KeyError:
-                print 'WARNING: No key '+imname+' in '+fname+'. Skipping calculation!'
-                sys.stdout.flush()
-                return True
-            # Create a new WCS object
-            w[f] = wcs.WCS(hd)
+            mask[f] = {}
+            w[f] = {}
+            for n_z_bin, z_bin in enumerate(z_bins):
+                # Read mask and create WCS object
+                imname = 'MASK_{}_Z{}'.format(f,n_z_bin+1)
+                fname = path['mask_'+f]
+                try:
+                    mask[f][n_z_bin+1] = io.read_from_fits(fname, imname)
+                    hd = io.read_header_from_fits(fname, imname)
+                except KeyError:
+                    print 'WARNING: No key '+imname+' in '+fname+'. Skipping calculation!'
+                    sys.stdout.flush()
+                    return True
+                # Create a new WCS object
+                w[f][n_z_bin+1] = wcs.WCS(hd)
 
         # Read galaxy catalogue
         tabname = 'data'
@@ -631,8 +634,8 @@ def prep_fourier(args):
             for n_z_bin, z_bin in enumerate(z_bins):
                 filt = set.filter_galaxies(cat, z_bin[0], z_bin[1], field=f)
                 pix = np.transpose([cat[filt]['ALPHA_J2000'],cat[filt]['DELTA_J2000']])
-                pix = w[f].wcs_world2pix(pix, 0).astype(int)
-                masked = np.where(np.array([mask[f][iy,ix] for ix,iy in pix])<=0)[0]
+                pix = w[f][n_z_bin+1].wcs_world2pix(pix, 0).astype(int)
+                masked = np.where(np.array([mask[f][n_z_bin+1][iy,ix] for ix,iy in pix])<=0)[0]
                 filt[filt][masked] = False
                 filter[f][n_z_bin] = filt
         # Print progress message
@@ -645,7 +648,7 @@ def prep_fourier(args):
             for n_z_bin, z_bin in enumerate(z_bins):
                 filt = filter[f][n_z_bin]
                 pix = np.transpose([cat[filt]['ALPHA_J2000'],cat[filt]['DELTA_J2000']])
-                pix = w[f].wcs_world2pix(pix, 0).astype(int)
+                pix = w[f][n_z_bin+1].wcs_world2pix(pix, 0).astype(int)
                 m_corr[filt] = np.array([m[f][n_z_bin][iy,ix] for ix,iy in pix])
         cat['e1'] = cat['e1']/(1+m_corr)
         cat['e2'] = (cat['e2']-cat['c2'])/(1+m_corr)
@@ -655,10 +658,10 @@ def prep_fourier(args):
 
 
         # Useful functions (area, n_eff, sigma_g)
-        def get_area(fields, mask=mask, size_pix=size_pix):
+        def get_area(fields, nb, mask=mask, size_pix=size_pix):
             area = 0.
             for f in fields:
-                area += mask[f].sum()*(size_pix/60.)**2.
+                area += mask[f][nb+1].sum()*(size_pix/60.)**2.
             return area
         def get_n_eff(cat, area):
             wsum2 = (cat['weight'].sum())**2
@@ -694,7 +697,7 @@ def prep_fourier(args):
             gals = cat[sel]
             pz_z = pz_full[sel]
             # Get n_eff
-            area = get_area(fields)
+            area = get_area(fields,n_z_bin)
             n_eff[n_z_bin] = get_n_eff(gals, area)
             # Get sigma_g
             sigma_g[n_z_bin] = get_sigma_g(gals)
@@ -708,7 +711,7 @@ def prep_fourier(args):
                 gals = cat[filter[f][n_z_bin]]
                 pz_z = pz_full[filter[f][n_z_bin]]
                 # Get n_eff
-                area = get_area([f])
+                area = get_area([f],n_z_bin)
                 n_eff_f[count,n_z_bin] = get_n_eff(gals, area)
                 # Get sigma_g
                 sigma_g_f[count,n_z_bin] = get_sigma_g(gals)
@@ -953,23 +956,27 @@ def prep_fourier(args):
             # Read mask
             fname = path['mask_'+f]
             # Get masks for each bin
+            t = 'MASK_{}_Z1'.format(f)
+            try:
+                hd = io.read_header_from_fits(fname, t) # Header is the same for each bin
+            except KeyError:
+                print 'WARNING: No key {} in {}. Skipping calculation!'.format(t,fname)
+                sys.stdout.flush()
+                return True
+            mask = np.zeros((len(z_bins),hd['NAXIS2'],hd['NAXIS1']))
             for n_z_bin, z_bin in enumerate(z_bins):
                 t = 'MASK_{}_Z{}'.format(f, n_z_bin+1)
                 try:
                     mask[n_z_bin] = io.read_from_fits(fname, t)
-                except UnboundLocalError:
-                    mask_tmp = io.read_from_fits(fname, t)
-                    mask = np.zeros((len(z_bins))+(mask_tmp.shape))
-                    mask[n_z_bin] = mask_tmp
                 except KeyError:
-                    print 'WARNING: No key '+t+' in '+fname+'. Skipping calculation!'
+                    print 'WARNING: No key {} in {}. Skipping calculation!'.format(t,fname)
                     sys.stdout.flush()
                     return True
 
             # Read maps
             fname = path['map_'+f]
             n_pols = 2 # Number of shear polarizations (always 2)
-            map = np.zeros((n_pols)+(mask.shape))
+            map = np.zeros((n_pols,)+mask.shape)
             # Get maps for each polarization and bin
             for count in range(n_pols):
                 for n_z_bin, z_bin in enumerate(z_bins):
@@ -977,7 +984,7 @@ def prep_fourier(args):
                     try:
                         map[count,n_z_bin] = io.read_from_fits(fname, t)
                     except KeyError:
-                        print 'WARNING: No key '+t+' in '+fname+'. Skipping calculation!'
+                        print 'WARNING: No key {} in {}. Skipping calculation!'.format(t,fname)
                         sys.stdout.flush()
                         return True
 
@@ -1104,49 +1111,49 @@ def prep_fourier(args):
 
 # ------------------- Pipeline ------------------------------------------------#
 
-    # if is_run_mask:
-    #     start = time.clock()
-    #     warning = run_mask() or warning
-    #     end = time.clock()
-    #     hrs, rem = divmod(end-start, 3600)
-    #     mins, secs = divmod(rem, 60)
-    #     print 'Run MASK module in {:0>2} Hours {:0>2} Minutes {:05.2f} Seconds!'.format(int(hrs),int(mins),secs)
-    #     sys.stdout.flush()
-    # if is_run_mult:
-    #     start = time.clock()
-    #     warning = run_mult() or warning
-    #     end = time.clock()
-    #     hrs, rem = divmod(end-start, 3600)
-    #     mins, secs = divmod(rem, 60)
-    #     print 'Run MULT_CORR module in {:0>2} Hours {:0>2} Minutes {:05.2f} Seconds!'.format(int(hrs),int(mins),secs)
-    #     sys.stdout.flush()
-    # if is_run_pz:
-    #     start = time.clock()
-    #     warning = run_pz() or warning
-    #     end = time.clock()
-    #     hrs, rem = divmod(end-start, 3600)
-    #     mins, secs = divmod(rem, 60)
-    #     print 'Run PHOTO_Z module in {:0>2} Hours {:0>2} Minutes {:05.2f} Seconds!'.format(int(hrs),int(mins),secs)
-    #     sys.stdout.flush()
-    # if is_run_cat:
-    #     start = time.clock()
-    #     warning = run_cat() or warning
-    #     end = time.clock()
-    #     hrs, rem = divmod(end-start, 3600)
-    #     mins, secs = divmod(rem, 60)
-    #     print 'Run CATALOGUE module in {:0>2} Hours {:0>2} Minutes {:05.2f} Seconds!'.format(int(hrs),int(mins),secs)
-    #     sys.stdout.flush()
-    # if is_run_map:
-    #     start = time.clock()
-    #     warning = run_map() or warning
-    #     end = time.clock()
-    #     hrs, rem = divmod(end-start, 3600)
-    #     mins, secs = divmod(rem, 60)
-    #     print 'Run MAP module in {:0>2} Hours {:0>2} Minutes {:05.2f} Seconds!'.format(int(hrs),int(mins),secs)
-    #     sys.stdout.flush()
+    if is_run_mask:
+        start = time.clock()
+        warning = run_mask() or warning
+        end = time.clock()
+        hrs, rem = divmod(end-start, 3600)
+        mins, secs = divmod(rem, 60)
+        print 'Run MASK module in {:0>2} Hours {:0>2} Minutes {:05.2f} Seconds!'.format(int(hrs),int(mins),secs)
+        sys.stdout.flush()
+    if is_run_mult:
+        start = time.clock()
+        warning = run_mult() or warning
+        end = time.clock()
+        hrs, rem = divmod(end-start, 3600)
+        mins, secs = divmod(rem, 60)
+        print 'Run MULT_CORR module in {:0>2} Hours {:0>2} Minutes {:05.2f} Seconds!'.format(int(hrs),int(mins),secs)
+        sys.stdout.flush()
+    if is_run_pz:
+        start = time.clock()
+        warning = run_pz() or warning
+        end = time.clock()
+        hrs, rem = divmod(end-start, 3600)
+        mins, secs = divmod(rem, 60)
+        print 'Run PHOTO_Z module in {:0>2} Hours {:0>2} Minutes {:05.2f} Seconds!'.format(int(hrs),int(mins),secs)
+        sys.stdout.flush()
+    if is_run_cat:
+        start = time.clock()
+        warning = run_cat() or warning
+        end = time.clock()
+        hrs, rem = divmod(end-start, 3600)
+        mins, secs = divmod(rem, 60)
+        print 'Run CATALOGUE module in {:0>2} Hours {:0>2} Minutes {:05.2f} Seconds!'.format(int(hrs),int(mins),secs)
+        sys.stdout.flush()
+    if is_run_map:
+        start = time.clock()
+        warning = run_map() or warning
+        end = time.clock()
+        hrs, rem = divmod(end-start, 3600)
+        mins, secs = divmod(rem, 60)
+        print 'Run MAP module in {:0>2} Hours {:0>2} Minutes {:05.2f} Seconds!'.format(int(hrs),int(mins),secs)
+        sys.stdout.flush()
     if is_run_cl:
         start = time.clock()
-        warning = run_cl(fields=['W3']) or warning
+        warning = run_cl() or warning
         end = time.clock()
         hrs, rem = divmod(end-start, 3600)
         mins, secs = divmod(rem, 60)

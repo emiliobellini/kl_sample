@@ -128,7 +128,6 @@ def get_cl(field, bp, hd, mask, map):
             # Calculate Cl's
             cl_c = nmt.compute_coupled_cell_flat(f[nb1+1],f[nb2+1],b)
             cl_d = wf.decouple_cell(cl_c)
-            print cl_d
             cl_d = np.reshape(cl_d,(n_pols,n_pols,n_ells))
             cl[:,:,nb1,nb2,:] = cl_d
             cl[:,:,nb2,nb1,:] = cl_d

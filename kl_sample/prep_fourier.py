@@ -1019,7 +1019,7 @@ def prep_fourier(args):
                         # plt.ylabel('$\\ell(\\ell+1)C_\\ell/2\\pi$')
                         plt.ylabel('$C_\\ell$')
                         plt.legend(loc='best')
-                        plt.savefig('{}/cl_{}_z{}{}.pdf'.format(path['plots'],f,nb1+1,nb2+1)))
+                        plt.savefig('{}/cl_{}_z{}{}.pdf'.format(path['plots'],f,nb1+1,nb2+1))
                         plt.close()
 
             io.print_info_fits(path['cl_'+f])

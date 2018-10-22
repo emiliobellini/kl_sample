@@ -69,7 +69,7 @@ def get_map(w, mask, cat, pos_in=None):
     print '----> Empty pixels: {0:5.2%}'.format(empty)
     sys.stdout.flush()
 
-    return map_1, map_2, pos
+    return np.array([map_1, map_2]), pos
 
 
 def get_cl(field, bp, hd, mask, map):
@@ -89,10 +89,9 @@ def get_cl(field, bp, hd, mask, map):
     """
 
     # Initialize Cls
-    n_pols = map.shape[0]
     n_bins = map.shape[1]
     n_ells = len(bp)
-    cl = np.zeros((n_pols,n_pols,n_bins,n_bins,n_ells))
+    cl = np.zeros((2,2,n_bins,n_bins,n_ells))
 
     # Dimensions
     Nx = hd['NAXIS1']
@@ -101,9 +100,7 @@ def get_cl(field, bp, hd, mask, map):
     Ly = Ny*abs(hd['CDELT2'])*np.pi/180 # Mask dimension in radians
 
     # Fields definition
-    f = {}
-    for n_bin in range(n_bins):
-        f[n_bin+1] = nmt.NmtFieldFlat(Lx,Ly,mask[n_bin],[map[0,n_bin],-map[1,n_bin]]) # Hardcoded n_pols=2
+    fd = np.array([nmt.NmtFieldFlat(Lx,Ly,mask[x],[map[0,x],-map[1,x]]) for x in range(n_bins)])
     # Bins for flat sky fields
     b = nmt.NmtBinFlat(bp[:,0],bp[:,1])
     # Effective ells
@@ -121,14 +118,14 @@ def get_cl(field, bp, hd, mask, map):
             try:
                 wf.read_from(mcm_p)
             except:
-                wf.compute_coupling_matrix(f[nb1+1],f[nb2+1],b)
+                wf.compute_coupling_matrix(fd[nb1],fd[nb2],b)
                 wf.write_to(mcm_p)
                 print 'Calculated mode coupling matrix for bins {}{}'.format(nb1+1,nb2+1)
                 sys.stdout.flush()
             # Calculate Cl's
-            cl_c = nmt.compute_coupled_cell_flat(f[nb1+1],f[nb2+1],b)
+            cl_c = nmt.compute_coupled_cell_flat(fd[nb1],fd[nb2],b)
             cl_d = wf.decouple_cell(cl_c)
-            cl_d = np.reshape(cl_d,(n_pols,n_pols,n_ells))
+            cl_d = np.reshape(cl_d,(2,2,n_ells))
             cl[:,:,nb1,nb2,:] = cl_d
             cl[:,:,nb2,nb1,:] = cl_d
 

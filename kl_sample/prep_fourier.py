@@ -72,7 +72,6 @@ def prep_fourier(args):
     for f in fields:
         path['mask_sec_'+f] = '{}/{}mask_arcsec_{}.fits.gz'.format(path['base'],path['fname'],f)
         path['mask_'+f] = '{}/mask_{}.fits'.format(path['base'],f)
-        path['mask_now_'+f] = '{}/mask_noweight_{}.fits'.format(path['base'],f)
         path['m_'+f] = '{}/{}mult_corr_{}.fits'.format(path['base'],path['fname'],f)
         path['cat_'+f] = '{}/{}cat_{}.fits'.format(path['base'],path['fname'],f)
         path['map_'+f] = '{}/{}map_{}.fits'.format(path['base'],path['fname'],f)
@@ -221,7 +220,6 @@ def prep_fourier(args):
             # Remove old output file to avoid confusion
             try:
                 os.remove(path['mask_'+f])
-                os.remove(path['mask_now_'+f])
             except:
                 pass
 
@@ -371,8 +369,8 @@ def prep_fourier(args):
 
 
             # Save to file the mask
-            name = 'MASK_{}'.format(f)
-            warning = io.write_to_fits(path['mask_now_'+f], mask, name, header=hd, type='image') or warning
+            name = 'MASK_NOW_{}'.format(f)
+            warning = io.write_to_fits(path['mask_'+f], mask, name, header=hd, type='image') or warning
 
             io.print_info_fits(path['mask_now_'+f])
 
@@ -391,10 +389,7 @@ def prep_fourier(args):
                 weights_mask = np.zeros(mask.shape)
 
                 # Filter galaxies
-                sel = cat['Z_B']>=z_bin[0]
-                sel = (cat['Z_B']<z_bin[1])*sel
-                sel = (cat['weight']>0.)*sel
-                sel = np.array([x[:2] in f for x in cat['id']])*sel
+                sel = set.filter_galaxies(cat, z_bin[0], z_bin[1], field=f)
                 gals = cat[sel]
                 # Get World position of each galaxy
                 pos = zip(gals['ALPHA_J2000'],gals['DELTA_J2000'])
@@ -409,10 +404,10 @@ def prep_fourier(args):
                     sel = pos[:,0] == pix[0]
                     sel = (pos[:,1] == pix[1])*sel
                     weight = gals[sel]['weight']
-                    weights_mask[tuple(pix)] = np.average(weight)
+                    weights_mask[tuple(pix)] = np.sum(weight)
 
                 # Get final mask
-                weights_mask = weights_mask*mask
+                weights_mask = mask*weights_mask
 
                 # Save to file the mask
                 name = 'MASK_{}_Z{}'.format(f, n_z_bin+1)
@@ -1000,7 +995,8 @@ def prep_fourier(args):
 
             # Generate plots
             if args.want_plots:
-                factor = ell*(ell+1.)/(2.*np.pi)
+                #factor = ell*(ell+1.)/(2.*np.pi)
+                factor = 1.
                 x = ell
                 for nb1 in range(len(z_bins)):
                     for nb2 in range(nb1,len(z_bins)):

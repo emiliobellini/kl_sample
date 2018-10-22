@@ -892,14 +892,14 @@ def prep_fourier(args):
                         return True
 
                 # Get map
-                map_1, map_2, _ = tools.get_map(w, mask, cat)
+                map, _ = tools.get_map(w, mask, cat)
 
 
                 # Save to file the map
                 name = 'MAP_{}_Z{}_G1'.format(f, n_z_bin+1)
-                warning = io.write_to_fits(path['map_'+f], map_1, name, header=hd, type='image') or warning
+                warning = io.write_to_fits(path['map_'+f], map[0], name, header=hd, type='image') or warning
                 name = 'MAP_{}_Z{}_G2'.format(f, n_z_bin+1)
-                warning = io.write_to_fits(path['map_'+f], map_2, name, header=hd, type='image') or warning
+                warning = io.write_to_fits(path['map_'+f], map[1], name, header=hd, type='image') or warning
 
                 # Generate plots
                 if args.want_plots:
@@ -941,7 +941,6 @@ def prep_fourier(args):
 
             # Read mask
             fname = path['mask_'+f]
-            # Get masks for each bin
             t = 'MASK_{}_Z1'.format(f)
             try:
                 hd = io.read_header_from_fits(fname, t) # Header is the same for each bin
@@ -949,6 +948,7 @@ def prep_fourier(args):
                 print 'WARNING: No key {} in {}. Skipping calculation!'.format(t,fname)
                 sys.stdout.flush()
                 return True
+            w = wcs.WCS(hd)
             mask = np.zeros((len(z_bins),hd['NAXIS2'],hd['NAXIS1']))
             for n_z_bin, z_bin in enumerate(z_bins):
                 t = 'MASK_{}_Z{}'.format(f, n_z_bin+1)
@@ -959,30 +959,44 @@ def prep_fourier(args):
                     sys.stdout.flush()
                     return True
 
-            # Read maps
-            fname = path['map_'+f]
-            n_pols = 2 # Number of shear polarizations (always 2)
-            map = np.zeros((n_pols,)+mask.shape)
-            # Get maps for each polarization and bin
-            for count in range(n_pols):
-                for n_z_bin, z_bin in enumerate(z_bins):
-                    t = 'MAP_{}_Z{}_G{}'.format(f, n_z_bin+1,count+1)
-                    try:
-                        map[count,n_z_bin] = io.read_from_fits(fname, t)
-                    except KeyError:
-                        print 'WARNING: No key {} in {}. Skipping calculation!'.format(t,fname)
+            # Read galaxy catalogue
+            fname = path['cat_'+f]
+            cat = {}
+            for n_z_bin, z_bin in enumerate(z_bins):
+                t = 'CAT_{}_Z{}'.format(f, n_z_bin+1)
+                try:
+                    cat[n_z_bin] = io.read_from_fits(fname, t)
+                except KeyError:
+                    print 'WARNING: No key {} in {}. Skipping calculation!'.format(t,fname)
+                    sys.stdout.flush()
+                    return True
+
+                # Check that the table has the correct columns
+                table_keys = ['ALPHA_J2000', 'DELTA_J2000', 'e1', 'e2', 'weight']
+                for key in table_keys:
+                    if key not in cat[n_z_bin].columns.names:
+                        print 'WARNING: No key '+key+' in table of '+fname+'. Skipping calculation!'
                         sys.stdout.flush()
                         return True
 
+            # Get maps
+            map = np.zeros((len(z_bins),2,hd['NAXIS2'],hd['NAXIS1']))
+            for n_z_bin, z_bin in enumerate(z_bins):
+                map[n_z_bin], _ = tools.get_map(w, mask[n_z_bin], cat[n_z_bin])
+
             # Get Cl's
-            ell, cl, tmp_files = tools.get_cl(f, bp, hd, mask, map)
-            [os.remove(x) for x in tmp_files] # Remove tmp files
+            map = np.transpose(map,axes=(1,0,2,3))
+            ell, cl, mcm_paths = pf.get_cl(f, bp, hd, mask, map)
 
             # Save to file the map
             name = 'ELL_{}'.format(f)
             warning = io.write_to_fits(path['cl_'+f], ell, name, type='image') or warning
             name = 'CL_{}'.format(f)
             warning = io.write_to_fits(path['cl_'+f], cl, name, type='image') or warning
+
+            # TODO: put noise here!
+            # [os.remove(x) for x in mcm_paths]
+
 
             # Generate plots
             if args.want_plots:
@@ -1002,7 +1016,8 @@ def prep_fourier(args):
                         plt.xscale('log')
                         plt.yscale('log')
                         plt.xlabel('$\\ell$')
-                        plt.ylabel('$\\ell(\\ell+1)C_\\ell/2\\pi$')
+                        # plt.ylabel('$\\ell(\\ell+1)C_\\ell/2\\pi$')
+                        plt.ylabel('$C_\\ell$')
                         plt.legend(loc='best')
                         plt.savefig('{}/cl_{}_z{}{}.pdf'.format(path['plots'],f,nb1+1,nb2+1)))
                         plt.close()

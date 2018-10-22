@@ -67,7 +67,8 @@ def argument_parser():
     #Arguments for 'prep_real'
     prep_real_parser.add_argument('input_folder', type=str, help='Input folder')
     #Arguments for 'prep_fourier'
-    prep_fourier_parser.add_argument('input_path', type=str, help='Input path (path/fname_)')
+    prep_fourier_parser.add_argument('input_path', type=str, help='Path to input files')
+    prep_fourier_parser.add_argument('--output_path', '-o', type=str, help='Path to output files')
     prep_fourier_parser.add_argument('--run_all', '-a', help='Run all routines '
         'even if the files are already present', action='store_true')
     prep_fourier_parser.add_argument('--run_mask', '-mk', help='Run mask routine '
@@ -81,8 +82,6 @@ def argument_parser():
     prep_fourier_parser.add_argument('--run_map', '-mp', help='Run map routine '
         'even if the files are already present', action='store_true')
     prep_fourier_parser.add_argument('--run_cl', '-cl', help='Run Cl routine '
-        'even if the files are already present', action='store_true')
-    prep_fourier_parser.add_argument('--run_cl_noise', '-cln', help='Run Cl noise routine '
         'even if the files are already present', action='store_true')
     prep_fourier_parser.add_argument('--want_plots', '-p', help='Generate plots for the images',
         action='store_true')
@@ -128,12 +127,14 @@ def path_exists_or_create(path):
     """
 
     abspath = os.path.abspath(path)
-    folder, _ = os.path.split(abspath)
+    folder, name = os.path.split(abspath)
+    if not bool(re.match('.+_', name, re.IGNORECASE)):
+        folder += '/{}'.format(name)
 
     if not os.path.exists(folder):
         os.makedirs(folder)
 
-    return abspath
+    return folder
 
 
 # ------------------- Read ini ------------------------------------------------#

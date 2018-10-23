@@ -52,13 +52,7 @@ def prep_fourier(args):
     # Number of simulations used to calculate the noise
     n_sims_noise = 1000
     # Bandpowers to calculate Cl's
-    bandpowers = np.array([[  30,   80],
-                           [  80,  260],
-                           [ 260,  450],
-                           [ 450,  670],
-                           [ 670, 1310],
-                           [1310, 2300],
-                           [2300, 5100]])
+    bandpowers = set.BANDPOWERS
 
 
 
@@ -1013,7 +1007,7 @@ def prep_fourier(args):
                     # Get map
                     map[n_z_bin], _ = tools.get_map(w, mask[n_z_bin], cat_sim, pos_in=pos[n_z_bin])
                 # Print message every some step
-                if (ns+1) % 1e1 == 0:
+                if (ns+1) % 1e2 == 0:
                     print '----> Done {0:5.1%} of the noise Cls ({1:d})'.format(float(ns+1)/n_sims,n_sims)
                     sys.stdout.flush()
                 # Get Cl's
@@ -1021,7 +1015,7 @@ def prep_fourier(args):
                 _ , noise_sims[ns], _ = tools.get_cl(f, bp, hd, mask, map, tmp_path=path['output'])
 
             # Remove tmp files
-            # [os.remove(x) for x in mcm_paths]TODO
+            [os.remove(x) for x in mcm_paths]
 
             # Get mean shape noise
             noise = np.mean(noise_sims, axis=0)
@@ -1033,7 +1027,6 @@ def prep_fourier(args):
 
             # Generate plots
             if args.want_plots:
-                #factor = ell*(ell+1.)/(2.*np.pi)
                 factor = 1.
                 x = ell
                 for nb1 in range(len(z_bins)):
@@ -1049,7 +1042,6 @@ def prep_fourier(args):
                         plt.xscale('log')
                         plt.yscale('log')
                         plt.xlabel('$\\ell$')
-                        # plt.ylabel('$\\ell(\\ell+1)C_\\ell/2\\pi$')
                         plt.ylabel('$C_\\ell$')
                         plt.legend(loc='best')
                         plt.savefig('{}/cl_{}_z{}{}.pdf'.format(path['plots'],f,nb1+1,nb2+1))
@@ -1064,49 +1056,49 @@ def prep_fourier(args):
 # ------------------- Pipeline ------------------------------------------------#
 
     if is_run_mask:
-        start = time.clock()
+        start = time.time()
         warning = run_mask() or warning
-        end = time.clock()
+        end = time.time()
         hrs, rem = divmod(end-start, 3600)
         mins, secs = divmod(rem, 60)
         print 'Run MASK module in {:0>2} Hours {:0>2} Minutes {:05.2f} Seconds!'.format(int(hrs),int(mins),secs)
         sys.stdout.flush()
     if is_run_mult:
-        start = time.clock()
+        start = time.time()
         warning = run_mult() or warning
-        end = time.clock()
+        end = time.time()
         hrs, rem = divmod(end-start, 3600)
         mins, secs = divmod(rem, 60)
         print 'Run MULT_CORR module in {:0>2} Hours {:0>2} Minutes {:05.2f} Seconds!'.format(int(hrs),int(mins),secs)
         sys.stdout.flush()
     if is_run_pz:
-        start = time.clock()
+        start = time.time()
         warning = run_pz() or warning
-        end = time.clock()
+        end = time.time()
         hrs, rem = divmod(end-start, 3600)
         mins, secs = divmod(rem, 60)
         print 'Run PHOTO_Z module in {:0>2} Hours {:0>2} Minutes {:05.2f} Seconds!'.format(int(hrs),int(mins),secs)
         sys.stdout.flush()
     if is_run_cat:
-        start = time.clock()
+        start = time.time()
         warning = run_cat() or warning
-        end = time.clock()
+        end = time.time()
         hrs, rem = divmod(end-start, 3600)
         mins, secs = divmod(rem, 60)
         print 'Run CATALOGUE module in {:0>2} Hours {:0>2} Minutes {:05.2f} Seconds!'.format(int(hrs),int(mins),secs)
         sys.stdout.flush()
     if is_run_map:
-        start = time.clock()
+        start = time.time()
         warning = run_map() or warning
-        end = time.clock()
+        end = time.time()
         hrs, rem = divmod(end-start, 3600)
         mins, secs = divmod(rem, 60)
         print 'Run MAP module in {:0>2} Hours {:0>2} Minutes {:05.2f} Seconds!'.format(int(hrs),int(mins),secs)
         sys.stdout.flush()
     if is_run_cl:
-        start = time.clock()
-        warning = run_cl(fields=['W1']) or warning#TODO
-        end = time.clock()
+        start = time.time()
+        warning = run_cl() or warning
+        end = time.time()
         hrs, rem = divmod(end-start, 3600)
         mins, secs = divmod(rem, 60)
         print 'Run CL module in {:0>2} Hours {:0>2} Minutes {:05.2f} Seconds!'.format(int(hrs),int(mins),secs)

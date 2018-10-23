@@ -45,6 +45,16 @@ MASK_THETA   = np.array([
                ])
 
 
+# Bandpowers to calculate Cl's
+BANDPOWERS = np.array([[  30,   80],
+                       [  80,  260],
+                       [ 260,  450],
+                       [ 450,  670],
+                       [ 670, 1310],
+                       [1310, 2300],
+                       [2300, 5100]])
+
+
 # CFHTlens specifications plus area of simulations
 FIELDS_CFHTLENS = ['W'+str(x+1) for x in range(4)]
 dZ_CFHTlens = 0.05

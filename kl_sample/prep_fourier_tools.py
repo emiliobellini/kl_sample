@@ -65,14 +65,14 @@ def get_map(w, mask, cat, pos_in=None):
     map_1[pos_unique[:,0],pos_unique[:,1]] = g1_at_pos
     map_2[pos_unique[:,0],pos_unique[:,1]] = g2_at_pos
 
-    empty = 1.-np.array([mask[tuple(x)] for x in pos_unique]).sum()/mask.flatten().sum()
-    print '----> Empty pixels: {0:5.2%}'.format(empty)
-    sys.stdout.flush()
+    # empty = 1.-np.array([mask[tuple(x)] for x in pos_unique]).sum()/mask.flatten().sum()
+    # print '----> Empty pixels: {0:5.2%}'.format(empty)
+    # sys.stdout.flush()
 
     return np.array([map_1, map_2]), pos
 
 
-def get_cl(field, bp, hd, mask, map):
+def get_cl(field, bp, hd, mask, map, tmp_path=None):
     """ Generate cl's from a mask and a map.
 
     Args:
@@ -111,7 +111,11 @@ def get_cl(field, bp, hd, mask, map):
     for nb1 in range(n_bins):
         for nb2 in range(nb1,n_bins):
             # Temporary path for mode coupling matrix
-            mcm_p = os.path.expanduser('~')+'/tmp_mcm_{}_Z{}{}.dat'.format(field,nb1+1,nb2+1)
+            if tmp_path is None:
+                mcm_p = os.path.expanduser('~')
+            else:
+                mcm_p = tmp_path
+            mcm_p = mcm_p+'/tmp_mcm_{}_Z{}{}.dat'.format(field,nb1+1,nb2+1)
             mcm_paths.append(mcm_p)
             # Define workspace for mode coupling matrix
             wf = nmt.NmtWorkspaceFlat()

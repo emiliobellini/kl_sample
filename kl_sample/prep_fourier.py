@@ -49,6 +49,8 @@ def prep_fourier(args):
     size_pix = 120
     # Range of pixels used to average the multiplicative correction
     n_avg_m = 2
+    # Number of simulations used to calculate the noise
+    n_sims_noise = 1000
     # Bandpowers to calculate Cl's
     bandpowers = np.array([[  30,   80],
                            [  80,  260],
@@ -363,7 +365,6 @@ def prep_fourier(args):
             name = 'MASK_NOW_{}'.format(f)
             warning = io.write_to_fits(path['mask_'+f], mask, name, header=hd, type='image') or warning
 
-            io.print_info_fits(path['mask_now_'+f])
 
             # Generate plots
             if args.want_plots:
@@ -517,7 +518,7 @@ def prep_fourier(args):
 
                     # Print message every some step
                     if (count+1) % 1e3 == 0:
-                        print '----> Done {0:5.1%} of the pixels ({1:d})'.format(float(count+1) /len(pos_unique), len(pos_unique))
+                        print '----> Done {0:5.1%} of the pixels ({1:d})'.format(float(count+1)/len(pos_unique), len(pos_unique))
                         sys.stdout.flush()
 
                 # Save to file the map
@@ -903,11 +904,11 @@ def prep_fourier(args):
 
                 # Generate plots
                 if args.want_plots:
-                    plt.imshow(map_1,interpolation='nearest')
+                    plt.imshow(map[0],interpolation='nearest')
                     plt.colorbar()
                     plt.savefig('{}/map_{}_z{}_g1.pdf'.format(path['plots'],f, n_z_bin+1))
                     plt.close()
-                    plt.imshow(map_2,interpolation='nearest')
+                    plt.imshow(map[1],interpolation='nearest')
                     plt.colorbar()
                     plt.savefig('{}/map_{}_z{}_g2.pdf'.format(path['plots'],f, n_z_bin+1))
                     plt.close()
@@ -920,7 +921,7 @@ def prep_fourier(args):
 
 # ------------------- Function to calculate the cl ----------------------------#
 
-    def run_cl(path=path, fields=fields, z_bins=z_bins, bp=bandpowers):
+    def run_cl(path=path, fields=fields, z_bins=z_bins, bp=bandpowers, n_sims=n_sims_noise):
 
         print 'Running CL module'
         sys.stdout.flush()
@@ -981,12 +982,13 @@ def prep_fourier(args):
 
             # Get maps
             map = np.zeros((len(z_bins),2,hd['NAXIS2'],hd['NAXIS1']))
+            pos = {}
             for n_z_bin, z_bin in enumerate(z_bins):
-                map[n_z_bin], _ = tools.get_map(w, mask[n_z_bin], cat[n_z_bin])
+                map[n_z_bin], pos[n_z_bin] = tools.get_map(w, mask[n_z_bin], cat[n_z_bin])
 
             # Get Cl's
             map = np.transpose(map,axes=(1,0,2,3))
-            ell, cl, mcm_paths = pf.get_cl(f, bp, hd, mask, map)
+            ell, cl, mcm_paths = tools.get_cl(f, bp, hd, mask, map, tmp_path=path['output'])
 
             # Save to file the map
             name = 'ELL_{}'.format(f)
@@ -994,8 +996,39 @@ def prep_fourier(args):
             name = 'CL_{}'.format(f)
             warning = io.write_to_fits(path['cl_'+f], cl, name, type='image') or warning
 
-            # TODO: put noise here!
-            # [os.remove(x) for x in mcm_paths]
+
+            # Get noise
+            noise_sims = np.zeros((n_sims,)+cl.shape)
+            for ns in range(n_sims):
+                map = np.zeros((len(z_bins),2,hd['NAXIS2'],hd['NAXIS1']))
+                # Generate random ellipticities
+                for n_z_bin, z_bin in enumerate(z_bins):
+                    cat_sim = cat[n_z_bin].copy()
+                    n_gals = len(cat_sim)
+                    phi=2*np.pi*np.random.rand(n_gals)
+                    cos = np.cos(2*phi)
+                    sin = np.sin(2*phi)
+                    cat_sim['e1'] = cat_sim['e1']*cos-cat_sim['e2']*sin
+                    cat_sim['e2'] = cat_sim['e1']*sin+cat_sim['e2']*cos
+                    # Get map
+                    map[n_z_bin], _ = tools.get_map(w, mask[n_z_bin], cat_sim, pos_in=pos[n_z_bin])
+                # Print message every some step
+                if (ns+1) % 1e1 == 0:
+                    print '----> Done {0:5.1%} of the noise Cls ({1:d})'.format(float(ns+1)/n_sims,n_sims)
+                    sys.stdout.flush()
+                # Get Cl's
+                map = np.transpose(map,axes=(1,0,2,3))
+                _ , noise_sims[ns], _ = tools.get_cl(f, bp, hd, mask, map, tmp_path=path['output'])
+
+            # Remove tmp files
+            # [os.remove(x) for x in mcm_paths]TODO
+
+            # Get mean shape noise
+            noise = np.mean(noise_sims, axis=0)
+
+            # Save to file the map
+            name = 'CL_NOISE_{}'.format(f)
+            warning = io.write_to_fits(path['cl_'+f], noise, name, type='image') or warning
 
 
             # Generate plots
@@ -1006,9 +1039,9 @@ def prep_fourier(args):
                 for nb1 in range(len(z_bins)):
                     for nb2 in range(nb1,len(z_bins)):
                         ax = plt.gca()
-                        for ng1 in range(n_pols):
-                            for ng2 in range(ng1,n_pols):
-                                y = factor*cl[ng1,ng2,nb1,nb2]
+                        for ng1 in range(2):
+                            for ng2 in range(ng1,2):
+                                y = factor*(cl[ng1,ng2,nb1,nb2]-noise[ng1,ng2,nb1,nb2])
                                 color = next(ax._get_lines.prop_cycler)['color']
                                 plt.plot(x, y,'o',label='$C_l^{{{}{}}}$'.format(ng1+1,ng2+1), color = color)
                                 plt.plot(x, -y,'*', color = color)
@@ -1072,7 +1105,7 @@ def prep_fourier(args):
         sys.stdout.flush()
     if is_run_cl:
         start = time.clock()
-        warning = run_cl() or warning
+        warning = run_cl(fields=['W1']) or warning#TODO
         end = time.clock()
         hrs, rem = divmod(end-start, 3600)
         mins, secs = divmod(rem, 60)

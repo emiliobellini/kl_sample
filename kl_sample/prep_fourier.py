@@ -71,6 +71,8 @@ def prep_fourier(args):
     path['cat_full'] = '{}/cat_full.fits'.format(path['input'])
     path['mask_url'] = '{}/mask_url.txt'.format(path['input'])
     path['photo_z'] = '{}/photo_z.fits'.format(path['output'])
+    path['cat_sims'] = '{}_sims/'.format(path['output'])
+    print path['cat_sims']
     for f in fields:
         path['mask_sec_'+f] = '{}/mask_arcsec_{}.fits.gz'.format(path['input'],f)
         path['mask_'+f] = '{}/mask_{}.fits'.format(path['output'],f)
@@ -78,6 +80,8 @@ def prep_fourier(args):
         path['cat_'+f] = '{}/cat_{}.fits'.format(path['output'],f)
         path['map_'+f] = '{}/map_{}.fits'.format(path['output'],f)
         path['cl_'+f] = '{}/cl_{}.fits'.format(path['output'],f)
+        path['cl_sims_'+f] = '{}/cl_sims_{}.fits'.format(path['output'],f)
+        path['covmat_'+f] = '{}/covmat_{}.fits'.format(path['output'],f)
 
     # Determine which modules have to be run, by checking the existence of the
     # output files and arguments passed by the user
@@ -99,6 +103,11 @@ def prep_fourier(args):
     is_run_cl = np.array([not(os.path.exists(path['cl_'+f])) for f in fields]).any()
     if args.run_cl or args.run_all:
         is_run_cl = True
+    is_run_covmat_1 = np.array([not(os.path.exists(path['cl_sims_'+f])) for f in fields]).any()
+    is_run_covmat_2 = np.array([not(os.path.exists(path['covmat_'+f])) for f in fields]).any()
+    is_run_covmat = is_run_covmat_1 or is_run_covmat_2
+    if args.run_covmat or args.run_all:
+        is_run_covmat = True
 
     # Check the existence of the required input files
     if is_run_mask:
@@ -168,6 +177,18 @@ def prep_fourier(args):
             warning = True
     else:
         print 'I will skip the CL module. Output files already there!'
+        sys.stdout.flush()
+    if is_run_covmat:
+        nofile1 = np.array([not(os.path.exists(path['mask_'+f])) for f in fields]).any()
+        nofile2 = np.array([not(os.path.exists(path['cl_'+f])) for f in fields]).any()
+        nofile3 = not(os.path.exists(path['cat_sims']))
+        if (not(is_run_mask) and nofile1) or (not(is_run_cl) and nofile2) or nofile3:
+            print 'WARNING: I will skip the Covmat module. Input files not found!'
+            sys.stdout.flush()
+            is_run_covmat = False
+            warning = True
+    else:
+        print 'I will skip the Covmat module. Output files already there!'
         sys.stdout.flush()
 
 
@@ -913,7 +934,7 @@ def prep_fourier(args):
 
 
 
-# ------------------- Function to calculate the cl ----------------------------#
+# ------------------- Function to calculate the cls ---------------------------#
 
     def run_cl(path=path, fields=fields, z_bins=z_bins, bp=bandpowers, n_sims=n_sims_noise):
 
@@ -1053,6 +1074,146 @@ def prep_fourier(args):
 
 
 
+# ------------------- Function to calculate the cls ---------------------------#
+
+    def run_covmat(path=path, fields=fields, z_bins=z_bins, bp=bandpowers):
+
+        print 'Running Covmat module'
+        sys.stdout.flush()
+        warning = False
+
+
+        # # First loop: scan over the fields
+        # for f in fields:
+        #
+        #     print 'Calculating cl for field {}:'.format(f)
+        #     sys.stdout.flush()
+        #
+        #     # Remove old output file to avoid confusion
+        #     try:
+        #         os.remove(path['cl_'+f])
+        #     except:
+        #         pass
+        #
+        #     # Read mask
+        #     fname = path['mask_'+f]
+        #     t = 'MASK_{}_Z1'.format(f)
+        #     try:
+        #         hd = io.read_header_from_fits(fname, t) # Header is the same for each bin
+        #     except KeyError:
+        #         print 'WARNING: No key {} in {}. Skipping calculation!'.format(t,fname)
+        #         sys.stdout.flush()
+        #         return True
+        #     w = wcs.WCS(hd)
+        #     mask = np.zeros((len(z_bins),hd['NAXIS2'],hd['NAXIS1']))
+        #     for n_z_bin, z_bin in enumerate(z_bins):
+        #         t = 'MASK_{}_Z{}'.format(f, n_z_bin+1)
+        #         try:
+        #             mask[n_z_bin] = io.read_from_fits(fname, t)
+        #         except KeyError:
+        #             print 'WARNING: No key {} in {}. Skipping calculation!'.format(t,fname)
+        #             sys.stdout.flush()
+        #             return True
+        #
+        #     # Read galaxy catalogue
+        #     fname = path['cat_'+f]
+        #     cat = {}
+        #     for n_z_bin, z_bin in enumerate(z_bins):
+        #         t = 'CAT_{}_Z{}'.format(f, n_z_bin+1)
+        #         try:
+        #             cat[n_z_bin] = io.read_from_fits(fname, t)
+        #         except KeyError:
+        #             print 'WARNING: No key {} in {}. Skipping calculation!'.format(t,fname)
+        #             sys.stdout.flush()
+        #             return True
+        #
+        #         # Check that the table has the correct columns
+        #         table_keys = ['ALPHA_J2000', 'DELTA_J2000', 'e1', 'e2', 'weight']
+        #         for key in table_keys:
+        #             if key not in cat[n_z_bin].columns.names:
+        #                 print 'WARNING: No key '+key+' in table of '+fname+'. Skipping calculation!'
+        #                 sys.stdout.flush()
+        #                 return True
+        #
+        #     # Get maps
+        #     map = np.zeros((len(z_bins),2,hd['NAXIS2'],hd['NAXIS1']))
+        #     pos = {}
+        #     for n_z_bin, z_bin in enumerate(z_bins):
+        #         map[n_z_bin], pos[n_z_bin] = tools.get_map(w, mask[n_z_bin], cat[n_z_bin])
+        #
+        #     # Get Cl's
+        #     map = np.transpose(map,axes=(1,0,2,3))
+        #     ell, cl, mcm_paths = tools.get_cl(f, bp, hd, mask, map, tmp_path=path['output'])
+        #
+        #     # Save to file the map
+        #     name = 'ELL_{}'.format(f)
+        #     warning = io.write_to_fits(path['cl_'+f], ell, name, type='image') or warning
+        #     name = 'CL_{}'.format(f)
+        #     warning = io.write_to_fits(path['cl_'+f], cl, name, type='image') or warning
+        #
+        #
+        #     # Get noise
+        #     noise_sims = np.zeros((n_sims,)+cl.shape)
+        #     for ns in range(n_sims):
+        #         map = np.zeros((len(z_bins),2,hd['NAXIS2'],hd['NAXIS1']))
+        #         # Generate random ellipticities
+        #         for n_z_bin, z_bin in enumerate(z_bins):
+        #             cat_sim = cat[n_z_bin].copy()
+        #             n_gals = len(cat_sim)
+        #             phi=2*np.pi*np.random.rand(n_gals)
+        #             cos = np.cos(2*phi)
+        #             sin = np.sin(2*phi)
+        #             cat_sim['e1'] = cat_sim['e1']*cos-cat_sim['e2']*sin
+        #             cat_sim['e2'] = cat_sim['e1']*sin+cat_sim['e2']*cos
+        #             # Get map
+        #             map[n_z_bin], _ = tools.get_map(w, mask[n_z_bin], cat_sim, pos_in=pos[n_z_bin])
+        #         # Print message every some step
+        #         if (ns+1) % 1e2 == 0:
+        #             print '----> Done {0:5.1%} of the noise Cls ({1:d})'.format(float(ns+1)/n_sims,n_sims)
+        #             sys.stdout.flush()
+        #         # Get Cl's
+        #         map = np.transpose(map,axes=(1,0,2,3))
+        #         _ , noise_sims[ns], _ = tools.get_cl(f, bp, hd, mask, map, tmp_path=path['output'])
+        #
+        #     # Remove tmp files
+        #     [os.remove(x) for x in mcm_paths]
+        #
+        #     # Get mean shape noise
+        #     noise = np.mean(noise_sims, axis=0)
+        #
+        #     # Save to file the map
+        #     name = 'CL_NOISE_{}'.format(f)
+        #     warning = io.write_to_fits(path['cl_'+f], noise, name, type='image') or warning
+        #
+        #
+        #     # Generate plots
+        #     if args.want_plots:
+        #         factor = 1.
+        #         x = ell
+        #         for nb1 in range(len(z_bins)):
+        #             for nb2 in range(nb1,len(z_bins)):
+        #                 ax = plt.gca()
+        #                 for ng1 in range(2):
+        #                     for ng2 in range(ng1,2):
+        #                         y = factor*(cl[ng1,ng2,nb1,nb2]-noise[ng1,ng2,nb1,nb2])
+        #                         color = next(ax._get_lines.prop_cycler)['color']
+        #                         plt.plot(x, y,'o',label='$C_l^{{{}{}}}$'.format(ng1+1,ng2+1), color = color)
+        #                         plt.plot(x, -y,'*', color = color)
+        #                 plt.title('Z = {}{}'.format(nb1+1,nb2+1))
+        #                 plt.xscale('log')
+        #                 plt.yscale('log')
+        #                 plt.xlabel('$\\ell$')
+        #                 plt.ylabel('$C_\\ell$')
+        #                 plt.legend(loc='best')
+        #                 plt.savefig('{}/cl_{}_z{}{}.pdf'.format(path['plots'],f,nb1+1,nb2+1))
+        #                 plt.close()
+        #
+        #     io.print_info_fits(path['cl_'+f])
+
+        return warning
+
+
+
 # ------------------- Pipeline ------------------------------------------------#
 
     if is_run_mask:
@@ -1102,6 +1263,14 @@ def prep_fourier(args):
         hrs, rem = divmod(end-start, 3600)
         mins, secs = divmod(rem, 60)
         print 'Run CL module in {:0>2} Hours {:0>2} Minutes {:05.2f} Seconds!'.format(int(hrs),int(mins),secs)
+        sys.stdout.flush()
+    if is_run_covmat:
+        start = time.time()
+        warning = run_covmat() or warning
+        end = time.time()
+        hrs, rem = divmod(end-start, 3600)
+        mins, secs = divmod(rem, 60)
+        print 'Run Covmat module in {:0>2} Hours {:0>2} Minutes {:05.2f} Seconds!'.format(int(hrs),int(mins),secs)
         sys.stdout.flush()
 
     if warning:

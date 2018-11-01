@@ -83,6 +83,8 @@ def argument_parser():
         'even if the files are already present', action='store_true')
     prep_fourier_parser.add_argument('--run_cl', '-cl', help='Run Cl routine '
         'even if the files are already present', action='store_true')
+    prep_fourier_parser.add_argument('--run_covmat', '-cm', help='Run Covmat routine '
+        'even if the files are already present', action='store_true')
     prep_fourier_parser.add_argument('--want_plots', '-p', help='Generate plots for the images',
         action='store_true')
     prep_fourier_parser.add_argument('--remove_files', '-rp', help='Remove downloaded files',

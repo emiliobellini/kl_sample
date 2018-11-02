@@ -72,7 +72,6 @@ def prep_fourier(args):
     path['mask_url'] = '{}/mask_url.txt'.format(path['input'])
     path['photo_z'] = '{}/photo_z.fits'.format(path['output'])
     path['cat_sims'] = '{}_sims/'.format(path['output'])
-    print path['cat_sims']
     for f in fields:
         path['mask_sec_'+f] = '{}/mask_arcsec_{}.fits.gz'.format(path['input'],f)
         path['mask_'+f] = '{}/mask_{}.fits'.format(path['output'],f)
@@ -1083,73 +1082,86 @@ def prep_fourier(args):
         warning = False
 
 
-        # # First loop: scan over the fields
-        # for f in fields:
-        #
-        #     print 'Calculating cl for field {}:'.format(f)
-        #     sys.stdout.flush()
-        #
-        #     # Remove old output file to avoid confusion
-        #     try:
-        #         os.remove(path['cl_'+f])
-        #     except:
-        #         pass
-        #
-        #     # Read mask
-        #     fname = path['mask_'+f]
-        #     t = 'MASK_{}_Z1'.format(f)
-        #     try:
-        #         hd = io.read_header_from_fits(fname, t) # Header is the same for each bin
-        #     except KeyError:
-        #         print 'WARNING: No key {} in {}. Skipping calculation!'.format(t,fname)
-        #         sys.stdout.flush()
-        #         return True
-        #     w = wcs.WCS(hd)
-        #     mask = np.zeros((len(z_bins),hd['NAXIS2'],hd['NAXIS1']))
-        #     for n_z_bin, z_bin in enumerate(z_bins):
-        #         t = 'MASK_{}_Z{}'.format(f, n_z_bin+1)
-        #         try:
-        #             mask[n_z_bin] = io.read_from_fits(fname, t)
-        #         except KeyError:
-        #             print 'WARNING: No key {} in {}. Skipping calculation!'.format(t,fname)
-        #             sys.stdout.flush()
-        #             return True
-        #
-        #     # Read galaxy catalogue
-        #     fname = path['cat_'+f]
-        #     cat = {}
-        #     for n_z_bin, z_bin in enumerate(z_bins):
-        #         t = 'CAT_{}_Z{}'.format(f, n_z_bin+1)
-        #         try:
-        #             cat[n_z_bin] = io.read_from_fits(fname, t)
-        #         except KeyError:
-        #             print 'WARNING: No key {} in {}. Skipping calculation!'.format(t,fname)
-        #             sys.stdout.flush()
-        #             return True
-        #
-        #         # Check that the table has the correct columns
-        #         table_keys = ['ALPHA_J2000', 'DELTA_J2000', 'e1', 'e2', 'weight']
-        #         for key in table_keys:
-        #             if key not in cat[n_z_bin].columns.names:
-        #                 print 'WARNING: No key '+key+' in table of '+fname+'. Skipping calculation!'
-        #                 sys.stdout.flush()
-        #                 return True
-        #
-        #     # Get maps
-        #     map = np.zeros((len(z_bins),2,hd['NAXIS2'],hd['NAXIS1']))
-        #     pos = {}
-        #     for n_z_bin, z_bin in enumerate(z_bins):
-        #         map[n_z_bin], pos[n_z_bin] = tools.get_map(w, mask[n_z_bin], cat[n_z_bin])
-        #
-        #     # Get Cl's
-        #     map = np.transpose(map,axes=(1,0,2,3))
-        #     ell, cl, mcm_paths = tools.get_cl(f, bp, hd, mask, map, tmp_path=path['output'])
-        #
-        #     # Save to file the map
-        #     name = 'ELL_{}'.format(f)
-        #     warning = io.write_to_fits(path['cl_'+f], ell, name, type='image') or warning
-        #     name = 'CL_{}'.format(f)
-        #     warning = io.write_to_fits(path['cl_'+f], cl, name, type='image') or warning
+        # First loop: scan over the fields
+        for f in fields:
+
+            print 'Calculating covmat for field {}:'.format(f)
+            sys.stdout.flush()
+
+
+            # Calculate Cl's if output file does not exist or requested
+            if args.run_covmat or args.run_all or not(os.path.exists(path['cl_sims_'+f])):
+                # Remove old output file to avoid confusion
+                try:
+                    os.remove(path['cl_sims_'+f])
+                except:
+                    pass
+
+                    # Read mask
+                    fname = path['mask_'+f]
+                    t = 'MASK_{}_Z1'.format(f)
+                    try:
+                        hd = io.read_header_from_fits(fname, t) # Header is the same for each bin
+                    except KeyError:
+                        print 'WARNING: No key {} in {}. Skipping calculation!'.format(t,fname)
+                        sys.stdout.flush()
+                        return True
+                w = wcs.WCS(hd)
+                mask = np.zeros((len(z_bins),hd['NAXIS2'],hd['NAXIS1']))
+                for n_z_bin, z_bin in enumerate(z_bins):
+                    t = 'MASK_{}_Z{}'.format(f, n_z_bin+1)
+                    try:
+                        mask[n_z_bin] = io.read_from_fits(fname, t)
+                    except KeyError:
+                        print 'WARNING: No key {} in {}. Skipping calculation!'.format(t,fname)
+                        sys.stdout.flush()
+                        return True
+
+
+                # List files present in the sims directory
+                list_sims = [path['cat_sims']+x for x in os.listdir(path['cat_sims']) if re.match('.+{}.fits'.format(f), x)]
+                list_sims = sorted(list_sims)
+
+                # Calculate Cl's for each simulation
+                for n_sim, fname in enumerate(list_sims):
+                    # Read galaxy catalogue
+                    cat = {}
+                    for n_z_bin, z_bin in enumerate(z_bins):
+                        t = 'CAT_{}_Z{}'.format(f, n_z_bin+1)
+                        try:
+                            cat[n_z_bin] = io.read_from_fits(fname, t)
+                        except KeyError:
+                            print 'WARNING: No key {} in {}. Skipping calculation!'.format(t,fname)
+                            sys.stdout.flush()
+                            return True
+
+                        # Check that the table has the correct columns
+                        table_keys = ['ALPHA_J2000', 'DELTA_J2000', 'e1', 'e2', 'weight']
+                        for key in table_keys:
+                            if key not in cat[n_z_bin].columns.names:
+                                print 'WARNING: No key '+key+' in table of '+fname+'. Skipping calculation!'
+                                sys.stdout.flush()
+                                return True
+
+                    # Get maps
+                    map = np.zeros((len(z_bins),2,hd['NAXIS2'],hd['NAXIS1']))
+                    pos = {}
+                    for n_z_bin, z_bin in enumerate(z_bins):
+                        map[n_z_bin], pos[n_z_bin] = tools.get_map(w, mask[n_z_bin], cat[n_z_bin])
+
+                    # Get Cl's
+                    map = np.transpose(map,axes=(1,0,2,3))
+                    ell, cl, mcm_paths = tools.get_cl(f, bp, hd, mask, map, tmp_path=path['output'])
+
+                    # Save to file the map
+                    if n_sim is 0:
+                        name = 'ELL_{}'.format(f)
+                        warning = io.write_to_fits(path['cl_sims_'+f], ell, name, type='image') or warning
+                    name = 'CL_SIM_{:04}_{}'.format(n_sim, f)
+                    warning = io.write_to_fits(path['cl_sims_'+f], cl, name, type='image') or warning
+
+        #     # Remove tmp files
+        #     [os.remove(x) for x in mcm_paths]
         #
         #
         #     # Get noise
@@ -1175,8 +1187,6 @@ def prep_fourier(args):
         #         map = np.transpose(map,axes=(1,0,2,3))
         #         _ , noise_sims[ns], _ = tools.get_cl(f, bp, hd, mask, map, tmp_path=path['output'])
         #
-        #     # Remove tmp files
-        #     [os.remove(x) for x in mcm_paths]
         #
         #     # Get mean shape noise
         #     noise = np.mean(noise_sims, axis=0)

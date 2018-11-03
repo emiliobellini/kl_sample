@@ -1189,10 +1189,9 @@ def prep_fourier(args):
             pass
 
 
-        # Initialize array with Cl's
+        # Read cl and cl noise
         cl = []
         cl_n = []
-        # Read cls
         for nf, f in enumerate(fields):
             fname = path['cl_'+f]
             imname = 'ELL_{}'.format(f)
@@ -1230,9 +1229,8 @@ def prep_fourier(args):
         warning = io.write_to_fits(path['final'], cl_n[:,1,1], 'CL_BB_NOISE', type='image') or warning
 
 
-        # Initialize array with Cl's
+        # Read cl sims
         cl = []
-        # Read cls
         for nf, f in enumerate(fields):
             fname = path['cl_sims_'+f]
             imname = 'CL_SIM_{}'.format(f)
@@ -1242,14 +1240,14 @@ def prep_fourier(args):
                 print 'WARNING: No key {} in {}. Skipping calculation!'.format(imname,fname)
                 sys.stdout.flush()
                 return True
-        # Write cl
+        # Write cl sims
         cl = np.array(cl)
         warning = io.write_to_fits(path['final'], cl[:,:,0,0], 'CL_SIM_EE', type='image') or warning
         warning = io.write_to_fits(path['final'], cl[:,:,0,1], 'CL_SIM_EB', type='image') or warning
         warning = io.write_to_fits(path['final'], cl[:,:,1,1], 'CL_SIM_BB', type='image') or warning
 
 
-        # Read and export photo_z
+        # Read and write photo_z
         fname = path['photo_z']
         imname = 'PHOTO_Z'
         try:
@@ -1260,7 +1258,7 @@ def prep_fourier(args):
             return True
         warning = io.write_to_fits(path['final'], image, imname, type='image') or warning
 
-        # Read and export n_eff
+        # Read and write n_eff
         fname = path['photo_z']
         imname = 'N_EFF'
         try:
@@ -1271,7 +1269,7 @@ def prep_fourier(args):
             return True
         warning = io.write_to_fits(path['final'], image, imname, type='image') or warning
 
-        # Read and export n_eff
+        # Read and write sigma_g
         fname = path['photo_z']
         imname = 'SIGMA_G'
         try:
@@ -1349,7 +1347,7 @@ def prep_fourier(args):
         sys.stdout.flush()
     # Collect everything in a single file
     start = time.time()
-    warning = run_final(fields=['W1']) or warning
+    warning = run_final() or warning
     end = time.time()
     hrs, rem = divmod(end-start, 3600)
     mins, secs = divmod(rem, 60)

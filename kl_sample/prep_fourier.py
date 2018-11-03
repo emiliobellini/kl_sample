@@ -1075,7 +1075,7 @@ def prep_fourier(args):
 
     def run_sims(path=path, fields=fields, z_bins=z_bins, bp=bandpowers):
 
-        print 'Running Covmat module'
+        print 'Running Cl sims module'
         sys.stdout.flush()
         warning = False
 
@@ -1189,29 +1189,65 @@ def prep_fourier(args):
             pass
 
 
-        # Read cls and simulations
-        for f in fields:
+        # Initialize array with Cl's
+        cl = []
+        cl_n = []
+        # Read cls
+        for nf, f in enumerate(fields):
             fname = path['cl_'+f]
-            imname = 'CL_NOISE_{}'.format(f)
+            imname = 'ELL_{}'.format(f)
             try:
-                cl = io.read_from_fits(fname, imname)
+                ell = io.read_from_fits(fname, imname)
             except KeyError:
                 print 'WARNING: No key {} in {}. Skipping calculation!'.format(imname,fname)
                 sys.stdout.flush()
                 return True
+            imname = 'CL_{}'.format(f)
+            try:
+                cl.append(io.read_from_fits(fname, imname))
+            except KeyError:
+                print 'WARNING: No key {} in {}. Skipping calculation!'.format(imname,fname)
+                sys.stdout.flush()
+                return True
+            imname = 'CL_NOISE_{}'.format(f)
+            try:
+                cl_n.append(io.read_from_fits(fname, imname))
+            except KeyError:
+                print 'WARNING: No key {} in {}. Skipping calculation!'.format(imname,fname)
+                sys.stdout.flush()
+                return True
+        # Write ells
+        warning = io.write_to_fits(path['final'], ell, 'ELL', type='image') or warning
+        # Write cl
+        cl = np.array(cl)
+        warning = io.write_to_fits(path['final'], cl[:,0,0], 'CL_EE', type='image') or warning
+        warning = io.write_to_fits(path['final'], cl[:,0,1], 'CL_EB', type='image') or warning
+        warning = io.write_to_fits(path['final'], cl[:,1,1], 'CL_BB', type='image') or warning
+        # Write cl noise
+        cl_n = np.array(cl_n)
+        warning = io.write_to_fits(path['final'], cl_n[:,0,0], 'CL_EE_NOISE', type='image') or warning
+        warning = io.write_to_fits(path['final'], cl_n[:,0,1], 'CL_EB_NOISE', type='image') or warning
+        warning = io.write_to_fits(path['final'], cl_n[:,1,1], 'CL_BB_NOISE', type='image') or warning
+
+
+        # Initialize array with Cl's
+        cl = []
+        # Read cls
+        for nf, f in enumerate(fields):
             fname = path['cl_sims_'+f]
             imname = 'CL_SIM_{}'.format(f)
             try:
-                cl_sims = io.read_from_fits(fname, imname)
+                cl.append(io.read_from_fits(fname, imname))
             except KeyError:
                 print 'WARNING: No key {} in {}. Skipping calculation!'.format(imname,fname)
                 sys.stdout.flush()
                 return True
+        # Write cl
+        cl = np.array(cl)
+        warning = io.write_to_fits(path['final'], cl[:,:,0,0], 'CL_SIM_EE', type='image') or warning
+        warning = io.write_to_fits(path['final'], cl[:,:,0,1], 'CL_SIM_EB', type='image') or warning
+        warning = io.write_to_fits(path['final'], cl[:,:,1,1], 'CL_SIM_BB', type='image') or warning
 
-            # Calculate Covariance matrix
-            print cl[0,0,1:-1].shape
-            print cl_sims[:,0,0,1:-1].shape
-        # warning = io.write_to_fits(path['final'], image, imname, type='image') or warning
 
         # Read and export photo_z
         fname = path['photo_z']

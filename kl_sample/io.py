@@ -57,6 +57,7 @@ def argument_parser():
     run_parser = subparsers.add_parser('run')
     prep_real_parser = subparsers.add_parser('prep_real')
     prep_fourier_parser = subparsers.add_parser('prep_fourier')
+    plots_parser = subparsers.add_parser('plots')
     get_kl_parser = subparsers.add_parser('get_kl')
 
     #Arguments for 'run'
@@ -83,12 +84,15 @@ def argument_parser():
         'even if the files are already present', action='store_true')
     prep_fourier_parser.add_argument('--run_cl', '-cl', help='Run Cl routine '
         'even if the files are already present', action='store_true')
-    prep_fourier_parser.add_argument('--run_covmat', '-cm', help='Run Covmat routine '
+    prep_fourier_parser.add_argument('--run_sims', '-cm', help='Run Cl sims routine '
         'even if the files are already present', action='store_true')
     prep_fourier_parser.add_argument('--want_plots', '-p', help='Generate plots for the images',
         action='store_true')
     prep_fourier_parser.add_argument('--remove_files', '-rp', help='Remove downloaded files',
         action='store_true')
+    #Arguments for 'plots'
+    plots_parser.add_argument('input_path', type=str, help='Path to input files')
+    plots_parser.add_argument('--output_path', '-o', type=str, help='Path to output files')
     #Arguments for 'get_kl'
     get_kl_parser.add_argument('params_file', type=str, help='Parameters file')
 

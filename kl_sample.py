@@ -29,6 +29,9 @@ if __name__ == '__main__':
     if args.mode == 'prep_fourier':
         from kl_sample.prep_fourier import prep_fourier
         sys.exit(prep_fourier(args))
+    if args.mode == 'plots':
+        from kl_sample.plots import plots
+        sys.exit(plots(args))
     if args.mode == 'run':
         from kl_sample.run import run
         sys.exit(run(args))

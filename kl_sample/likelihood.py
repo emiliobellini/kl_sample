@@ -101,14 +101,15 @@ def select_sims(data, settings):
 
 # ------------------- KL related ----------------------------------------------#
 
-def compute_kl(cosmo, data, settings):
+def compute_kl(params, pz, noise, ell_min=2, ell_max=2000, scale_dep=False):
     """ Compute the KL transform.
 
     Args:
-        cosmo: dictionary containing cosmology names,
-        values and mask.
-        data: dictionary containing the data stored.
-        settings: dictionary with all the settings used.
+        params: cosmological parameters.
+        pz: photo-z
+        noise: estimated noise.
+        ell_min, ell_max: minimum, maximum ell.
+        scale_dep: kl with scale dependence or not.
 
     Returns:
         array with the KL transform that will be used.
@@ -116,13 +117,12 @@ def compute_kl(cosmo, data, settings):
     """
 
     # Compute theory Cl's (S = signal)
-    cosmo_ccl = cosmo_tools.get_cosmo_ccl(cosmo['params'][:,1])
-    S = cosmo_tools.get_cls_ccl(cosmo_ccl, data['photo_z'], settings['ell_max'])
+    cosmo_ccl = cosmo_tools.get_cosmo_ccl(params)
+    S = cosmo_tools.get_cls_ccl(cosmo_ccl, pz, ell_max)
+    S = S[ell_min:ell_max+1]
 
-    # Compute theory Noise and Cholesky decompose it (N=LL^+)
-    n_eff = data['n_eff']*(180.*60./np.pi)**2. #converted in stedrad^-1
-    sigma_g = data['sigma_g']
-    N = np.array([np.diag(sigma_g**2/n_eff) for x in range(len(S))])
+    # Cholesky decomposition of noise (N=LL^+)
+    N = noise[ell_min:ell_max+1]
     L = np.linalg.cholesky(N)
     inv_L = np.linalg.inv(L)
 
@@ -144,10 +144,10 @@ def compute_kl(cosmo, data, settings):
     E = np.array([(E[x].T*signs[x]).T for x in range(len(S))])
 
     # Test if the transformation matrix gives the correct new Cl's
-    checks.kl_consistent(E, S, N, L, eigval, 1.e-12)
+    checks.kl_consistent(E, S, noise, L, eigval, 1.e-12)
 
     # Return either the scale dependent or independent KL transform
-    if settings['kl_scale_dep']:
+    if scale_dep:
         return E
 
     else:

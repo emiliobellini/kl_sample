@@ -4,6 +4,8 @@ This module contains functions to reshape and manipulate
 the correlation function and power spectra.
 
 Functions:
+ - mask_cl(cl)
+ - unify_fields_cl(cl, sims)
  - position_xipm(n, n_bins, n_theta)
  - unflatten_xipm(array)
  - flatten_xipm(corr, settings)
@@ -17,9 +19,99 @@ import settings as set
 
 
 
+# ------------------- Manipulate Cl's -----------------------------------------#
+
+def mask_cl(cl):
+    if cl.ndim==4:
+        return cl[:,1:-1]
+    elif cl.ndim==5:
+        return cl[:,:,1:-1]
+    else:
+        raise ValueError('Expected Cl\'s array with dimensions 4 or 5. Found {}'.format(cl.ndim))
+
+
+def clean_cl(cl, noise):
+    if cl.ndim==4:
+        return cl - noise
+    elif cl.ndim==5:
+        clean = np.array([cl[:,x]-noise for x in range(len(cl[0]))])
+        clean = np.transpose(clean,axes=(1,0,2,3,4))
+        return clean
+    else:
+        raise ValueError('Expected Cl\'s array with dimensions 4 or 5. Found {}'.format(cl.ndim))
+
+
+def flatten_cl(cl):
+    tr_idx = np.triu_indices(cl.shape[-1])
+    flat_cl = np.moveaxis(cl,[-2,-1],[0,1])
+    flat_cl = flat_cl[tr_idx]
+    flat_cl = np.moveaxis(flat_cl,[0],[-1])
+    flat_cl = flat_cl.reshape(flat_cl.shape[:-2]+(flat_cl.shape[-2]*flat_cl.shape[-1],))
+    return flat_cl
+
+
+def unflatten_cl(cl, shape):
+    tr_idx = np.triu_indices(shape[-1])
+    unflat_cl = np.zeros(shape)
+    tmp_cl = cl.reshape(shape[:-2]+(-1,))
+    tmp_cl = np.moveaxis(tmp_cl,[-1],[0])
+    unflat_cl = np.moveaxis(unflat_cl,[-2,-1],[0,1])
+    unflat_cl[tr_idx] = tmp_cl
+    unflat_cl = np.moveaxis(unflat_cl,[1],[0])
+    unflat_cl[tr_idx] = tmp_cl
+    unflat_cl = np.moveaxis(unflat_cl,[0,1],[-2,-1])
+    return unflat_cl
+
+
+def unify_fields_cl(cl, sims):
+    cl_flat = flatten_cl(cl)
+    sims_flat = flatten_cl(sims)
+    tot_cl = np.zeros(cl_flat.shape[1:])
+    tot_inv_cov = np.zeros(cl_flat.shape[1:]*2)
+    for nf in range(len(cl)):
+        cov = np.cov(sims_flat[nf].T)
+        inv_cov = np.linalg.inv(cov)
+        tot_inv_cov += inv_cov
+        tot_cl += np.dot(inv_cov, cl_flat[nf])
+    final_cl = np.dot(np.linalg.inv(tot_inv_cov), tot_cl)
+    final_cl = unflatten_cl(final_cl, cl.shape[1:])
+    return final_cl
+
+
+def deband_cl(cl, bp):
+    if cl.shape[-3] != bp.shape[0]:
+        raise ValueError('Bandpowers and Cl shape mismatch!')
+    new_shape = list(cl.shape)
+    new_shape[-3] = bp[-1,-1]
+    new_shape = tuple(new_shape)
+    cl_dbp = np.zeros(new_shape)
+    cl_dbp = np.moveaxis(cl_dbp,[-3],[0])
+    for count, range in enumerate(bp):
+        n_rep = range[1]-range[0]
+        cl_flat = cl[count].flatten()
+        cl_ext = np.repeat(cl[count],n_rep)
+        cl_ext = cl_ext.reshape(cl.shape[1:]+(n_rep,))
+        cl_ext = np.moveaxis(cl_ext,[-1],[0])
+        cl_dbp[range[0]:range[1]] = cl_ext
+    cl_dbp = np.moveaxis(cl_dbp,[0],[-3])
+    return cl_dbp
+
+def band_cl(cl, bp):
+    if cl.shape[-3] < bp[-1,-1]+1:
+        raise ValueError('Bandpowers and Cl shape mismatch!')
+    new_shape = list(cl.shape)
+    new_shape[-3] = bp.shape[0]
+    new_shape = tuple(new_shape)
+    cl_bp = np.zeros(new_shape)
+    cl_bp = np.moveaxis(cl_bp,[-3],[0])
+    for count, range in enumerate(bp):
+        cl_re = np.moveaxis(cl,[-3],[0])
+        cl_bp[count] = np.average(cl_re[range[0]:range[1]],axis=0)
+    cl_bp = np.moveaxis(cl_bp,[0],[-3])
+    return cl_bp
+
 # ------------------- Flatten and unflatten correlation function --------------#
 
-    #Given the position in the array, find the corresponding position in the unflattened array
 def position_xipm(n, n_bins, n_theta):
     """ Given the position in the array, find the
         corresponding position in the unflattened array.

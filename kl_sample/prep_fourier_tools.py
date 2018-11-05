@@ -91,7 +91,7 @@ def get_cl(field, bp, hd, mask, map, tmp_path=None):
     # Initialize Cls
     n_bins = map.shape[1]
     n_ells = len(bp)
-    cl = np.zeros((2,2,n_bins,n_bins,n_ells))
+    cl = np.zeros((2,2,n_ells,n_bins,n_bins))
 
     # Dimensions
     Nx = hd['NAXIS1']
@@ -130,7 +130,7 @@ def get_cl(field, bp, hd, mask, map, tmp_path=None):
             cl_c = nmt.compute_coupled_cell_flat(fd[nb1],fd[nb2],b)
             cl_d = wf.decouple_cell(cl_c)
             cl_d = np.reshape(cl_d,(2,2,n_ells))
-            cl[:,:,nb1,nb2,:] = cl_d
-            cl[:,:,nb2,nb1,:] = cl_d
+            cl[:,:,:,nb1,nb2] = cl_d
+            cl[:,:,:,nb2,nb1] = cl_d
 
     return ell, cl, mcm_paths

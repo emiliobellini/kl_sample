@@ -83,7 +83,7 @@ def get_cl(field, bp, hd, mask, map, tmp_path=None):
         map: maps for each bin and polarization.
 
     Returns:
-        cl: array with cl (E/B, bins, ell).
+        cl: array with cl (E/B, ell, bins).
         mcm_path: path to the mode coupling matrix.
 
     """
@@ -115,7 +115,7 @@ def get_cl(field, bp, hd, mask, map, tmp_path=None):
                 mcm_p = os.path.expanduser('~')
             else:
                 mcm_p = tmp_path
-            mcm_p = mcm_p+'/tmp_mcm_{}_Z{}{}.dat'.format(field,nb1+1,nb2+1)
+            mcm_p = mcm_p+'/mcm_{}_Z{}{}.dat'.format(field,nb1+1,nb2+1)
             mcm_paths.append(mcm_p)
             # Define workspace for mode coupling matrix
             wf = nmt.NmtWorkspaceFlat()

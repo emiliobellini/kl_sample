@@ -91,8 +91,8 @@ def argument_parser():
     prep_fourier_parser.add_argument('--remove_files', '-rp', help='Remove downloaded files',
         action='store_true')
     #Arguments for 'plots'
-    plots_parser.add_argument('input_path', type=str, help='Path to input files')
-    plots_parser.add_argument('--output_path', '-o', type=str, help='Path to output files')
+    plots_parser.add_argument('output_path', type=str, help='Path to output files')
+    plots_parser.add_argument('--params_file', '-p', type=str, help='Path to parameter file')
     #Arguments for 'get_kl'
     get_kl_parser.add_argument('params_file', type=str, help='Parameters file')
 

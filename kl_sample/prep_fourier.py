@@ -570,21 +570,18 @@ def prep_fourier(args):
         mask = {}
         w = {}
         for f in fields:
-            mask[f] = {}
-            w[f] = {}
-            for n_z_bin, z_bin in enumerate(z_bins):
-                # Read mask and create WCS object
-                imname = 'MASK_{}_Z{}'.format(f,n_z_bin+1)
-                fname = path['mask_'+f]
-                try:
-                    mask[f][n_z_bin+1] = io.read_from_fits(fname, imname)
-                    hd = io.read_header_from_fits(fname, imname)
-                except KeyError:
-                    print 'WARNING: No key '+imname+' in '+fname+'. Skipping calculation!'
-                    sys.stdout.flush()
-                    return True
-                # Create a new WCS object
-                w[f][n_z_bin+1] = wcs.WCS(hd)
+            # Read mask and create WCS object
+            imname = 'MASK_NOW_{}'.format(f)
+            fname = path['mask_'+f]
+            try:
+                mask[f] = io.read_from_fits(fname, imname)
+                hd = io.read_header_from_fits(fname, imname)
+            except KeyError:
+                print 'WARNING: No key '+imname+' in '+fname+'. Skipping calculation!'
+                sys.stdout.flush()
+                return True
+            # Create a new WCS object
+            w[f] = wcs.WCS(hd)
 
         # Read galaxy catalogue
         tabname = 'data'
@@ -633,8 +630,8 @@ def prep_fourier(args):
             for n_z_bin, z_bin in enumerate(z_bins):
                 filt = set.filter_galaxies(cat, z_bin[0], z_bin[1], field=f)
                 pix = np.transpose([cat[filt]['ALPHA_J2000'],cat[filt]['DELTA_J2000']])
-                pix = w[f][n_z_bin+1].wcs_world2pix(pix, 0).astype(int)
-                masked = np.where(np.array([mask[f][n_z_bin+1][iy,ix] for ix,iy in pix])<=0)[0]
+                pix = w[f].wcs_world2pix(pix, 0).astype(int)
+                masked = np.where(np.array([mask[f][iy,ix] for ix,iy in pix])<=0)[0]
                 filt[filt][masked] = False
                 filter[f][n_z_bin] = filt
         # Print progress message
@@ -647,7 +644,7 @@ def prep_fourier(args):
             for n_z_bin, z_bin in enumerate(z_bins):
                 filt = filter[f][n_z_bin]
                 pix = np.transpose([cat[filt]['ALPHA_J2000'],cat[filt]['DELTA_J2000']])
-                pix = w[f][n_z_bin+1].wcs_world2pix(pix, 0).astype(int)
+                pix = w[f].wcs_world2pix(pix, 0).astype(int)
                 m_corr[filt] = np.array([m[f][n_z_bin][iy,ix] for ix,iy in pix])
         cat['e1'] = cat['e1']/(1+m_corr)
         cat['e2'] = (cat['e2']-cat['c2'])/(1+m_corr)
@@ -657,10 +654,10 @@ def prep_fourier(args):
 
 
         # Useful functions (area, n_eff, sigma_g)
-        def get_area(fields, nb, mask=mask, size_pix=size_pix):
+        def get_area(fields, mask=mask, size_pix=size_pix):
             area = 0.
             for f in fields:
-                area += mask[f][nb+1].sum()*(size_pix/60.)**2.
+                area += mask[f].sum()*(size_pix/60.)**2.
             return area
         def get_n_eff(cat, area):
             wsum2 = (cat['weight'].sum())**2
@@ -696,7 +693,7 @@ def prep_fourier(args):
             gals = cat[sel]
             pz_z = pz_full[sel]
             # Get n_eff
-            area = get_area(fields,n_z_bin)
+            area = get_area(fields)
             n_eff[n_z_bin] = get_n_eff(gals, area)
             # Get sigma_g
             sigma_g[n_z_bin] = get_sigma_g(gals)
@@ -710,7 +707,7 @@ def prep_fourier(args):
                 gals = cat[filter[f][n_z_bin]]
                 pz_z = pz_full[filter[f][n_z_bin]]
                 # Get n_eff
-                area = get_area([f],n_z_bin)
+                area = get_area([f])
                 n_eff_f[count,n_z_bin] = get_n_eff(gals, area)
                 # Get sigma_g
                 sigma_g_f[count,n_z_bin] = get_sigma_g(gals)
@@ -1032,9 +1029,6 @@ def prep_fourier(args):
                 map = np.transpose(map,axes=(1,0,2,3))
                 _ , noise_sims[ns], _ = tools.get_cl(f, bp, hd, mask, map, tmp_path=path['output'])
 
-            # Remove tmp files
-            [os.remove(x) for x in mcm_paths]
-
             # Get mean shape noise
             noise = np.mean(noise_sims, axis=0)
 
@@ -1164,9 +1158,6 @@ def prep_fourier(args):
             warning = io.write_to_fits(path['cl_sims_'+f], ell, name, type='image') or warning
             name = 'CL_SIM_{}'.format(f)
             warning = io.write_to_fits(path['cl_sims_'+f], cl, name, type='image') or warning
-
-            # Remove tmp files
-            [os.remove(x) for x in mcm_paths]
 
             io.print_info_fits(path['cl_sims_'+f])
 

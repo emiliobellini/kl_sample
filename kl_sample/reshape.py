@@ -16,6 +16,7 @@ Functions:
 
 import numpy as np
 import settings as set
+import pymaster as nmt
 
 
 
@@ -63,22 +64,48 @@ def unflatten_cl(cl, shape):
     return unflat_cl
 
 
+def flatten_covmat(cov):
+    flat_cov = np.moveaxis(cov,[-5,-4,-3,-2],[-3,-5,-2,-4])
+    flat_cov = flatten_cl(flat_cov)
+    flat_cov = np.moveaxis(flat_cov,[-1],[-4])
+    flat_cov = flatten_cl(flat_cov)
+    return flat_cov
+
+
+def unflatten_covmat(cov, cl_shape):
+    unflat_cov = np.apply_along_axis(unflatten_cl, -1, cov, cl_shape[-3:])
+    unflat_cov = np.apply_along_axis(unflatten_cl, -4, unflat_cov, cl_shape[-3:])
+    unflat_cov = np.moveaxis(unflat_cov,[-5,-4,-3,-2],[-4,-2,-5,-3])
+    return unflat_cov
+
+
+def get_covmat_cl(sims):
+    sims_flat = flatten_cl(sims)
+    ns = sims_flat.shape[-2]
+    nd = sims_flat.shape[-1]
+    factor = (ns-1.)/(ns-nd-2.)
+    if len(sims_flat.shape) == 2:
+        cov = np.cov(sims_flat.T)
+    elif len(sims_flat.shape) == 3:
+        cov = np.array([np.cov(x.T) for x in sims_flat])
+    else:
+        raise ValueError('Input dimensions can be either 2 or 3, found {}'.format(len(sims_flat.shape)))
+    return factor*unflatten_covmat(cov, sims.shape[-3:])
+
+
 def unify_fields_cl(cl, sims):
     cl_flat = flatten_cl(cl)
-    sims_flat = flatten_cl(sims)
-    tot_cl = np.zeros(cl_flat.shape[1:])
-    tot_inv_cov = np.zeros(cl_flat.shape[1:]*2)
-    for nf in range(len(cl)):
-        cov = np.cov(sims_flat[nf].T)
-        inv_cov = np.linalg.inv(cov)
-        tot_inv_cov += inv_cov
-        tot_cl += np.dot(inv_cov, cl_flat[nf])
-    final_cl = np.dot(np.linalg.inv(tot_inv_cov), tot_cl)
-    final_cl = unflatten_cl(final_cl, cl.shape[1:])
-    return final_cl
+    cov = get_covmat_cl(sims)
+    cov = flatten_covmat(cov)
+    inv_cov = np.array([np.linalg.inv(x) for x in cov])
+    tot_inv_cov = np.sum(inv_cov,axis=0)
+    tot_cl = np.array([np.dot(inv_cov[x], cl_flat[x].T) for x in range(len(cl))])
+    tot_cl = np.sum(tot_cl, axis=0)
+    tot_cl = np.dot(np.linalg.inv(tot_inv_cov), tot_cl).T
+    tot_cl = unflatten_cl(tot_cl, cl.shape[1:])
+    return tot_cl
 
-
-def deband_cl(cl, bp):
+def debin_cl(cl, bp):
     if cl.shape[-3] != bp.shape[0]:
         raise ValueError('Bandpowers and Cl shape mismatch!')
     new_shape = list(cl.shape)
@@ -96,7 +123,7 @@ def deband_cl(cl, bp):
     cl_dbp = np.moveaxis(cl_dbp,[0],[-3])
     return cl_dbp
 
-def band_cl(cl, bp):
+def bin_cl(cl, bp):
     if cl.shape[-3] < bp[-1,-1]+1:
         raise ValueError('Bandpowers and Cl shape mismatch!')
     new_shape = list(cl.shape)
@@ -109,6 +136,24 @@ def band_cl(cl, bp):
         cl_bp[count] = np.average(cl_re[range[0]:range[1]],axis=0)
     cl_bp = np.moveaxis(cl_bp,[0],[-3])
     return cl_bp
+
+def couple_decouple_cl(ell, cl, mcm_path, n_fields, n_bins, n_bp):
+    nmt_cl = np.moveaxis(cl,[0],[-1])
+    nmt_cl = np.stack((nmt_cl,np.zeros(nmt_cl.shape),np.zeros(nmt_cl.shape),np.zeros(nmt_cl.shape)))
+    nmt_cl = np.moveaxis(nmt_cl,[0],[-2])
+    final_cl = np.zeros((n_fields, n_bins, n_bins, n_bp))
+    for nb1 in range(n_bins):
+        for nb2 in range(nb1,n_bins):
+            for nf in range(n_fields):
+                wf = nmt.NmtWorkspaceFlat()
+                wf.read_from(mcm_path+'mcm_W{}_Z{}{}.dat'.format(nf+1,nb1+1,nb2+1))
+                cl_pfb = wf.couple_cell(ell, nmt_cl[nb1,nb2])
+                cl_pfb = wf.decouple_cell(cl_pfb)
+                final_cl[nf, nb1, nb2] = cl_pfb[0]
+                final_cl[nf, nb2, nb1] = cl_pfb[0]
+    final_cl = np.moveaxis(final_cl,[-1],[-3])
+    return final_cl
+
 
 # ------------------- Flatten and unflatten correlation function --------------#
 

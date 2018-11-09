@@ -160,6 +160,7 @@ def get_theory(var, full, mask, data, settings):
     theta = data['theta_ell']
     ell_max = settings['ell_max']
 
+
     # Merge in a single array varying and fixed parameters
     pars = np.empty(len(mask))
     count1 = 0
@@ -171,18 +172,36 @@ def get_theory(var, full, mask, data, settings):
             count1 = count1+1
 
 
-    # Get xipm
+    # Get corr
     cosmo = get_cosmo_ccl(pars)
-    cls = get_cls_ccl(cosmo, pz, ell_max)
-    xipm = get_xipm_ccl(cosmo, cls, theta)
+    corr = get_cls_ccl(cosmo, pz, ell_max)
+    if settings['space'] == 'real':
+        corr = get_xipm_ccl(cosmo, corr, theta)
+    else:
+        bp = settings['bp_ell']
+        ell = np.arange(bp[-1,-1]+1)
+        nf = settings['n_fields']
+        nb = settings['n_bins']
+        corr = rsh.couple_decouple_cl(ell, corr, settings['mcm'], nf, nb, len(bp))
+        corr = rsh.unify_fields_cl(corr, data['cov_pf'])
 
-    # Reshape xipm
+    # Apply KL
     if settings['method'] in ['kl_off_diag', 'kl_diag']:
-        xipm = lkl.apply_kl(data['kl_t'], xipm, settings)
-    xipm = rsh.flatten_xipm(xipm, settings)
-    xipm = rsh.mask_xipm(xipm, data['mask_theta_ell'], settings)
+        corr = lkl.apply_kl(data['kl_t'], corr, settings)
+    if settings['method'] == 'kl_diag':
+        is_diag = True
+    else:
+        is_diag = False
 
-    return xipm
+    # Reshape corr
+    if settings['space'] == 'real':
+        corr = rsh.flatten_xipm(corr, settings)
+        corr = rsh.mask_xipm(corr, data['mask_theta_ell'], settings)
+    else:
+        corr = rsh.mask_cl(corr, is_diag=is_diag)
+        corr = rsh.flatten_cl(corr, is_diag=is_diag)
+
+    return corr
 
 
 def get_sigma_8(var, full, mask):

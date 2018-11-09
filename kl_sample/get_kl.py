@@ -59,8 +59,9 @@ def get_kl(args):
         noise = io.read_from_fits(path['data'], 'CL_EE_NOISE')
         sim = io.read_from_fits(path['data'], 'CL_SIM_EE')
         sim = rsh.clean_cl(sim, noise)
-        noise = rsh.unify_fields_cl(noise, sim)
-        noise = rsh.deband_cl(noise, ell_bp)
+        cov_pf = rsh.get_covmat_cl(sim)
+        noise = rsh.unify_fields_cl(noise, cov_pf)
+        noise = rsh.debin_cl(noise, ell_bp)
 
 
 

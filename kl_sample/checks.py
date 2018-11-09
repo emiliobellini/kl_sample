@@ -46,7 +46,7 @@ def unused_params(cosmo, settings, path):
                 name , _ = line.split('=')
                 name = name.strip()
                 if name not in params:
-                    print('Unused parameter: ' + line)
+                    print('Unused parameter: {}'.format(line).rstrip('\n'))
                     sys.stdout.flush()
     return
 
@@ -126,30 +126,26 @@ def sanity_checks(cosmo, settings, path):
     with fits.open(path['data']) as hdul:
         imgs = [hdul[n].name for n in range(1,len(hdul))]
         # Checks common to real and fourier spaces
-        for name in ['PHOTO_Z', 'N_EFF', 'SIGMA_G']:
+        for name in ['PHOTO_Z']:
             test = name in imgs
             assert test, name + ' was not found in the data file!'
         # Checks related to real space
-        if settings['space']=='real':
+        if settings['space'] == 'real':
             for name in ['XIPM_OBS', 'XIPM_SIM']:
                 test = name in imgs
                 assert test, name + ' was not found in data file!'
-        # Checks related to real space
-        elif settings['space']=='fourier':
-            raise ValueError('Fourier space not implemented yet!')
+        # Checks related to fourier space
+        elif settings['space'] == 'fourier':
+            for name in ['ELL', 'CL_EE', 'CL_EE_NOISE', 'CL_SIM_EE']:
+                test = name in imgs
+                assert test, name + ' was not found in data file!'
 
         # Check data dimensions
         n_bins = hdul['PHOTO_Z'].shape[0]-1
         # Photo_z
         test = len(hdul['PHOTO_Z'].shape) == 2
         assert test, 'photo_z has wrong dimensions!'
-        # n_eff
-        test = hdul['N_EFF'].shape == (n_bins,)
-        assert test, 'n_eff has wrong dimensions!'
-        # sigma_g
-        test = hdul['SIGMA_G'].shape == (n_bins,)
-        assert test, 'sigma_g has wrong dimensions!'
-        if settings['space']=='real':
+        if settings['space'] == 'real':
             n_theta = len(set.THETA_ARCMIN)
             n_fields = hdul['XIPM_SIM'].shape[0]
             n_sims = hdul['XIPM_SIM'].shape[1]
@@ -158,6 +154,17 @@ def sanity_checks(cosmo, settings, path):
             assert test, 'xipm_obs has wrong dimensions!'
             test = hdul['XIPM_SIM'].shape == (n_fields, n_sims,2,n_theta,n_bins,n_bins)
             assert test, 'xipm_sim has wrong dimensions!'
+        elif settings['space'] == 'fourier':
+            n_ell = hdul['ELL'].shape[0]
+            n_fields = hdul['CL_SIM_EE'].shape[0]
+            n_sims = hdul['CL_SIM_EE'].shape[1]
+            # cl_obs
+            test = hdul['CL_EE'].shape == (n_fields,n_ell,n_bins,n_bins)
+            assert test, 'CL_EE has wrong dimensions!'
+            test = hdul['CL_EE_NOISE'].shape == (n_fields,n_ell,n_bins,n_bins)
+            assert test, 'CL_EE_NOISE has wrong dimensions!'
+            test = hdul['CL_SIM_EE'].shape == (n_fields,n_sims,n_ell,n_bins,n_bins)
+            assert test, 'CL_SIM_EE has wrong dimensions!'
 
         # if n_sims is natural check that it is smaller than
         # the max n_sims we have

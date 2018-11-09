@@ -54,7 +54,6 @@ def run(args):
         'sampler' : io.read_param(path['params'], 'sampler'),
         'space' : io.read_param(path['params'], 'space'),
         'method' : io.read_param(path['params'], 'method'),
-        'ell_max' : io.read_param(path['params'], 'ell_max', type='int'),
         'n_sims' : io.read_param(path['params'], 'n_sims')
     }
     # Sampler settings
@@ -69,6 +68,18 @@ def run(args):
         settings['n_kl'] = io.read_param(path['params'], 'n_kl', type='int')
         settings['kl_scale_dep'] = io.read_param(path['params'], 'kl_scale_dep', type='bool')
         settings['kl_on'] = io.read_param(path['params'], 'kl_on')
+    if settings['method']=='kl_diag':
+        is_diag = True
+    else:
+        is_diag = False
+    # Real/Fourier space settings and mcm path
+    if settings['space']=='real':
+        settings['ell_max'] = io.read_param(path['params'], 'ell_max', type='int')
+    elif settings['space']=='fourier':
+        settings['bp_ell'] = set.BANDPOWERS
+        settings['ell_max'] = settings['bp_ell'][-1,-1]
+        settings['mcm'] = io.read_param(args.params_file, 'mcm', type='path')+'/'
+        io.path_exists_or_error(settings['mcm'])
 
 
     # Check if there are unused parameters.
@@ -81,9 +92,7 @@ def run(args):
 
     # Read data
     data = {
-        'photo_z' : io.read_from_fits(path['data'], 'photo_z'),
-        'n_eff'   : io.read_from_fits(path['data'], 'n_eff'),
-        'sigma_g' : io.read_from_fits(path['data'], 'sigma_g')
+        'photo_z' : io.read_from_fits(path['data'], 'photo_z')
     }
     if settings['space']=='real':
         data['theta_ell'] = np.array(set.THETA_ARCMIN)/60. #CCL wants theta in degrees
@@ -91,7 +100,13 @@ def run(args):
         data['corr_obs'] = io.read_from_fits(path['data'], 'xipm_obs')
         data['corr_sim'] = io.read_from_fits(path['data'], 'xipm_sim')
     elif settings['space']=='fourier':
-        raise ValueError('Fourier space not implemented yet!')
+        data['theta_ell'] = io.read_from_fits(path['data'], 'ELL')
+        data['mask_theta_ell'] = set.MASK_ELL
+        cl_EE = io.read_from_fits(path['data'], 'CL_EE')
+        noise_EE = io.read_from_fits(path['data'], 'CL_EE_NOISE')
+        sims_EE = io.read_from_fits(path['data'], 'CL_SIM_EE')
+        data['corr_obs'] = rsh.clean_cl(cl_EE, noise_EE)
+        data['corr_sim'] = rsh.clean_cl(sims_EE, noise_EE)
     if settings['method'] in ['kl_diag', 'kl_off_diag']:
         data['kl_t'] = io.read_from_fits(path['data'], 'kl_t')
 
@@ -105,8 +120,7 @@ def run(args):
 
     # ------------------- Preliminary computations ----------------------------#
     # TODO:for now implemented only:
-    # - sampler = emcee
-    # - space = real
+    # - sampler = emcee, single_point
     # - kl_scale_dep = no
     # - kl_on = fourier
 
@@ -114,6 +128,10 @@ def run(args):
     # Compute how many simulations have to be used
     settings['n_sims'] = lkl.how_many_sims(data, settings)
     data['corr_sim'] = lkl.select_sims(data, settings)
+    if settings['space']=='fourier':
+        data['cov_pf'] = rsh.get_covmat_cl(data['corr_sim'])
+        data['corr_obs'] = rsh.unify_fields_cl(data['corr_obs'], data['cov_pf'])
+        data['corr_sim'] = rsh.unify_fields_cl(data['corr_sim'], data['cov_pf'])
 
 
     # If KL
@@ -121,30 +139,43 @@ def run(args):
         # Apply KL to observed correlation function
         data['corr_obs'] = lkl.apply_kl(data['kl_t'], data['corr_obs'], settings)
         # Apply KL to simulated correlation functions
+        data['corr_sim'] = lkl.apply_kl(data['kl_t'], data['corr_sim'], settings)
+
+
+    # Prepare data if real
+    if settings['space']=='real':
+
+        # Reshape observed correlation function
+        data['corr_obs'] = rsh.flatten_xipm(data['corr_obs'], settings)
+
+        # Reshape simulated correlation functions
         cs = np.empty((settings['n_fields'],settings['n_sims'])+data['corr_obs'].shape)
         for nf in range(settings['n_fields']):
             for ns in range(settings['n_sims']):
-                cs[nf][ns] = lkl.apply_kl(data['kl_t'], data['corr_sim'][nf][ns], settings)
+                cs[nf][ns] = rsh.flatten_xipm(data['corr_sim'][nf][ns], settings)
         data['corr_sim'] = cs
 
+        # Mask observed correlation function
+        data['corr_obs'] = rsh.mask_xipm(data['corr_obs'], data['mask_theta_ell'], settings)
 
-    # Reshape observed correlation function
-    data['corr_obs'] = rsh.flatten_xipm(data['corr_obs'], settings)
-
-    # Reshape simulated correlation functions
-    cs = np.empty((settings['n_fields'],settings['n_sims'])+data['corr_obs'].shape)
-    for nf in range(settings['n_fields']):
-        for ns in range(settings['n_sims']):
-            cs[nf][ns] = rsh.flatten_xipm(data['corr_sim'][nf][ns], settings)
-    data['corr_sim'] = cs
+        # Compute inverse covariance matrix
+        data['inv_cov_mat'] = lkl.compute_inv_covmat(data, settings)
 
 
-    # Mask observed correlation function
-    data['corr_obs'] = rsh.mask_xipm(data['corr_obs'], data['mask_theta_ell'], settings)
+    # Prepare data if fourier
+    else:
 
+        # Mask observed Cl's
+        data['corr_obs'] = rsh.mask_cl(data['corr_obs'], is_diag=is_diag)
+        # Reshape observed Cl's
+        data['corr_obs'] = rsh.flatten_cl(data['corr_obs'], is_diag=is_diag)
 
-    # Compute inverse covariance matrix
-    data['inv_cov_mat'] = lkl.compute_inv_covmat(data, settings)
+        # Calculate covmat Cl's
+        data['corr_sim'] = rsh.mask_cl(data['corr_sim'], is_diag=is_diag)
+        cov = rsh.get_covmat_cl(data['corr_sim'], is_diag=is_diag)
+        cov = rsh.flatten_covmat(cov, is_diag=is_diag)
+        data['inv_cov_mat'] = np.linalg.inv(cov)
+
 
 
 
@@ -159,3 +190,5 @@ def run(args):
 
 
     print 'Success!!'
+
+    return

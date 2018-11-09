@@ -54,6 +54,7 @@ BANDPOWERS = np.array([[  30,   80],
                        [ 670, 1310],
                        [1310, 2300],
                        [2300, 5100]])
+MASK_ELL = np.array([False,  True,  True,  True,  True,  True, False])
 
 
 # CFHTlens specifications plus area of simulations

@@ -175,13 +175,15 @@ def apply_kl(kl_t, corr, settings):
 
     # Apply KL transform
     corr_kl = kl_t.dot(corr).dot(kl_t.T)
-    corr_kl = np.transpose(corr_kl, axes=[1, 2, 0, 3])
+    corr_kl = np.moveaxis(corr_kl,[0],[-2])
 
     # Reduce dimensions of the array
     n_kl = settings['n_kl']
-    corr_kl = corr_kl[:,:,:n_kl,:n_kl]
+    corr_kl = np.moveaxis(corr_kl,[-2,-1],[0,1])
+    corr_kl = corr_kl[:n_kl,:n_kl]
+    corr_kl = np.moveaxis(corr_kl,[0,1],[-2,-1])
     if settings['method'] == 'kl_diag':
-        corr_kl = np.diagonal(corr_kl,  axis1=2, axis2=3)
+        corr_kl = np.diagonal(corr_kl,  axis1=-2, axis2=-1)
 
     return corr_kl
 

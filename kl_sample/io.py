@@ -134,7 +134,9 @@ def path_exists_or_create(path):
 
     abspath = os.path.abspath(path)
     folder, name = os.path.split(abspath)
-    if not bool(re.match('.+_', name, re.IGNORECASE)):
+    cond1 = not bool(re.match('.+_', name, re.IGNORECASE))
+    cond2 = not bool(re.match('.+\..{3}', name, re.IGNORECASE))
+    if cond1 and cond2:
         folder += '/{}'.format(name)
 
     if not os.path.exists(folder):

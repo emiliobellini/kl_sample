@@ -22,13 +22,15 @@ import pymaster as nmt
 
 # ------------------- Manipulate Cl's -----------------------------------------#
 
-def mask_cl(cl):
-    if cl.ndim==4:
-        return cl[:,1:-1]
-    elif cl.ndim==5:
-        return cl[:,:,1:-1]
+def mask_cl(cl, is_diag=False):
+    if is_diag:
+        idx = -2
     else:
-        raise ValueError('Expected Cl\'s array with dimensions 4 or 5. Found {}'.format(cl.ndim))
+        idx = -3
+    mask_cl = np.moveaxis(cl,[idx],[0])
+    mask_cl = mask_cl[set.MASK_ELL]
+    mask_cl = np.moveaxis(mask_cl,[0],[idx])
+    return mask_cl
 
 
 def clean_cl(cl, noise):
@@ -42,45 +44,58 @@ def clean_cl(cl, noise):
         raise ValueError('Expected Cl\'s array with dimensions 4 or 5. Found {}'.format(cl.ndim))
 
 
-def flatten_cl(cl):
-    tr_idx = np.triu_indices(cl.shape[-1])
-    flat_cl = np.moveaxis(cl,[-2,-1],[0,1])
-    flat_cl = flat_cl[tr_idx]
-    flat_cl = np.moveaxis(flat_cl,[0],[-1])
+def flatten_cl(cl, is_diag=False):
+    flat_cl = cl
+    if not is_diag:
+        tr_idx = np.triu_indices(cl.shape[-1])
+        flat_cl = np.moveaxis(flat_cl,[-2,-1],[0,1])
+        flat_cl = flat_cl[tr_idx]
+        flat_cl = np.moveaxis(flat_cl,[0],[-1])
     flat_cl = flat_cl.reshape(flat_cl.shape[:-2]+(flat_cl.shape[-2]*flat_cl.shape[-1],))
     return flat_cl
 
 
-def unflatten_cl(cl, shape):
-    tr_idx = np.triu_indices(shape[-1])
-    unflat_cl = np.zeros(shape)
-    tmp_cl = cl.reshape(shape[:-2]+(-1,))
-    tmp_cl = np.moveaxis(tmp_cl,[-1],[0])
-    unflat_cl = np.moveaxis(unflat_cl,[-2,-1],[0,1])
-    unflat_cl[tr_idx] = tmp_cl
-    unflat_cl = np.moveaxis(unflat_cl,[1],[0])
-    unflat_cl[tr_idx] = tmp_cl
-    unflat_cl = np.moveaxis(unflat_cl,[0,1],[-2,-1])
+def unflatten_cl(cl, shape, is_diag=False):
+    if is_diag:
+        unflat_cl = cl.reshape(shape)
+    else:
+        tr_idx = np.triu_indices(shape[-1])
+        unflat_cl = np.zeros(shape)
+        tmp_cl = cl.reshape(shape[:-2]+(-1,))
+        tmp_cl = np.moveaxis(tmp_cl,[-1],[0])
+        unflat_cl = np.moveaxis(unflat_cl,[-2,-1],[0,1])
+        unflat_cl[tr_idx] = tmp_cl
+        unflat_cl = np.moveaxis(unflat_cl,[1],[0])
+        unflat_cl[tr_idx] = tmp_cl
+        unflat_cl = np.moveaxis(unflat_cl,[0,1],[-2,-1])
     return unflat_cl
 
 
-def flatten_covmat(cov):
-    flat_cov = np.moveaxis(cov,[-5,-4,-3,-2],[-3,-5,-2,-4])
-    flat_cov = flatten_cl(flat_cov)
-    flat_cov = np.moveaxis(flat_cov,[-1],[-4])
-    flat_cov = flatten_cl(flat_cov)
+def flatten_covmat(cov, is_diag=False):
+    if is_diag:
+        flat_cov = np.moveaxis(cov,[-3,-2],[-2,-3])
+        idx = 2
+    else:
+        flat_cov = np.moveaxis(cov,[-5,-4,-3,-2],[-3,-5,-2,-4])
+        idx = 3
+    flat_cov = flatten_cl(flat_cov, is_diag)
+    flat_cov = np.moveaxis(flat_cov,[-1],[-1-idx])
+    flat_cov = flatten_cl(flat_cov, is_diag)
     return flat_cov
 
 
-def unflatten_covmat(cov, cl_shape):
-    unflat_cov = np.apply_along_axis(unflatten_cl, -1, cov, cl_shape[-3:])
-    unflat_cov = np.apply_along_axis(unflatten_cl, -4, unflat_cov, cl_shape[-3:])
-    unflat_cov = np.moveaxis(unflat_cov,[-5,-4,-3,-2],[-4,-2,-5,-3])
+def unflatten_covmat(cov, cl_shape, is_diag=False):
+    unflat_cov = np.apply_along_axis(unflatten_cl, -1, cov, cl_shape, is_diag)
+    unflat_cov = np.apply_along_axis(unflatten_cl, -1-len(cl_shape), unflat_cov, cl_shape, is_diag)
+    if is_diag:
+        unflat_cov = np.moveaxis(unflat_cov,[-3,-2],[-2,-3])
+    else:
+        unflat_cov = np.moveaxis(unflat_cov,[-5,-4,-3,-2],[-4,-2,-5,-3])
     return unflat_cov
 
 
-def get_covmat_cl(sims):
-    sims_flat = flatten_cl(sims)
+def get_covmat_cl(sims, is_diag=False):
+    sims_flat = flatten_cl(sims, is_diag)
     ns = sims_flat.shape[-2]
     nd = sims_flat.shape[-1]
     factor = (ns-1.)/(ns-nd-2.)
@@ -90,13 +105,16 @@ def get_covmat_cl(sims):
         cov = np.array([np.cov(x.T) for x in sims_flat])
     else:
         raise ValueError('Input dimensions can be either 2 or 3, found {}'.format(len(sims_flat.shape)))
-    return factor*unflatten_covmat(cov, sims.shape[-3:])
+    if is_diag:
+        shape = sims.shape[-2:]
+    else:
+        shape = sims.shape[-3:]
+    return factor*unflatten_covmat(cov, shape, is_diag)
 
 
-def unify_fields_cl(cl, sims):
+def unify_fields_cl(cl, cov_pf):
     cl_flat = flatten_cl(cl)
-    cov = get_covmat_cl(sims)
-    cov = flatten_covmat(cov)
+    cov = flatten_covmat(cov_pf)
     inv_cov = np.array([np.linalg.inv(x) for x in cov])
     tot_inv_cov = np.sum(inv_cov,axis=0)
     tot_cl = np.array([np.dot(inv_cov[x], cl_flat[x].T) for x in range(len(cl))])

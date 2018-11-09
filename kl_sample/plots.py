@@ -26,7 +26,7 @@ def plots(args):
     # Define absolute paths
     path = {}
     path['params'] = io.path_exists_or_error(args.params_file)
-    path['mcm'] = io.path_exists_or_error(io.read_param(args.params_file, 'mcm_path', type='path'))+'/'
+    path['mcm'] = io.path_exists_or_error(io.read_param(args.params_file, 'mcm', type='path'))+'/'
     path['fourier'] = io.path_exists_or_error('{}/data/data_fourier.fits'.format(sys.path[0]))
     path['real'] = io.path_exists_or_error('{}/data/data_real.fits'.format(sys.path[0]))
     path['output'] = io.path_exists_or_create(os.path.abspath(args.output_path))+'/'
@@ -61,12 +61,13 @@ def plots(args):
     # th_cl = rsh.bin_cl(th_cl, bp)
     tot_ell = np.arange(bp[-1,-1]+1)
     th_cl = rsh.couple_decouple_cl(tot_ell, th_cl, path['mcm'], len(fields), n_bins, len(bp))
-    th_cl = rsh.unify_fields_cl(th_cl, sims_EE)
+    cov_pf = rsh.get_covmat_cl(sims_EE)
+    th_cl = rsh.unify_fields_cl(th_cl, cov_pf)
 
     # Unify fields
-    cl_EE = rsh.unify_fields_cl(cl_EE, sims_EE)
-    noise_EE = rsh.unify_fields_cl(noise_EE, sims_EE)
-    sims_EE = rsh.unify_fields_cl(sims_EE, sims_EE)
+    cl_EE = rsh.unify_fields_cl(cl_EE, cov_pf)
+    noise_EE = rsh.unify_fields_cl(noise_EE, cov_pf)
+    sims_EE = rsh.unify_fields_cl(sims_EE, cov_pf)
 
     # Average simulations
     sims_EE_avg = np.average(sims_EE, axis=0)

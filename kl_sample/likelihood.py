@@ -253,6 +253,10 @@ def lnlike(var, full, mask, data, settings):
 
     """
 
+    s8 = cosmo_tools.get_sigma_8(var, full, mask)
+    if s8 < set.SIGMA_8_MIN or s8 > set.SIGMA_8_MAX:
+        return -np.inf
+
     #Get theory
     try:
         th = cosmo_tools.get_theory(var, full, mask, data, settings)

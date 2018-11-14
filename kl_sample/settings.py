@@ -33,10 +33,6 @@ default_params = {
 }
 
 
-# Hard priors on sigma8
-SIGMA_8_MIN = 0.2
-SIGMA_8_MAX = 1.24
-
 
 # Photo-z Bins (minimum, maximum and intermediate bins)
 Z_BINS = [0.15,0.29,0.43,0.57,0.70,0.90,1.10,1.30]

@@ -253,17 +253,24 @@ def lnlike(var, full, mask, data, settings):
 
     """
 
-    s8 = cosmo_tools.get_sigma_8(var, full, mask)
-    if s8 < set.SIGMA_8_MIN or s8 > set.SIGMA_8_MAX:
-        return -np.inf
-
     #Get theory
+    import signal
+    tmout = 600
+    def handler(signum, frame):
+        raise Exception()
+    signal.signal(signal.SIGALRM, handler)
+    signal.alarm(tmout)
     try:
         th = cosmo_tools.get_theory(var, full, mask, data, settings)
+    except Exception:
+        print 'CCL timeout with pars = ' + str(var)
+        sys.stdout.flush()
+        return -np.inf
     except:
         print 'CCL failure with pars = ' + str(var)
         sys.stdout.flush()
         return -np.inf
+    signal.alarm(0)
 
     obs = data['corr_obs']
     icov = data['inv_cov_mat']

@@ -253,6 +253,7 @@ def lnlike(var, full, mask, data, settings):
 
     """
 
+#    print var
     #Get theory
     import signal
     tmout = 600

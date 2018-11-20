@@ -8,6 +8,7 @@ single point (single_point).
 """
 
 import numpy as np
+import pyccl as ccl
 import io
 import cosmo as cosmo_tools
 import checks
@@ -31,6 +32,8 @@ def run(args):
 
 
     # ------------------- Initialize ------------------------------------------#
+
+    print ccl.__version__
 
     # Define absolute paths and check the existence of each required file
     path = {

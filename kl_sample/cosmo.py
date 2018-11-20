@@ -87,11 +87,9 @@ def get_cls_ccl(cosmo, pz, ell_max):
 
     # Tracers
     lens = np.array([
-        ccl.ClTracerLensing(
+        ccl.WeakLensingTracer(
             cosmo,
-            False,
-            z=pz[0].astype(np.float64),
-            n=pz[1:][x].astype(np.float64)
+            dndz=(pz[0].astype(np.float64),pz[1:][x].astype(np.float64))
         ) for x in range(n_bins)])
 
     # Cl's

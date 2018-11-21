@@ -177,13 +177,6 @@ def sanity_checks(cosmo, settings, path):
         # n_kl
         test = settings['n_kl'] > 0 and settings['n_kl'] <= n_bins
         assert test, 'n_kl should be at least 1 and at most {}'.format(n_bins)
-        # kl_on
-        test = settings['kl_on'] in ['real', 'fourier']
-        assert test, 'kl_on not recognized! Options: real, fourier'
-        # if kl_scale_dep check that space and kl_on are the same
-        if settings['kl_scale_dep']:
-            test = settings['space'] == settings['kl_on']
-            assert test, 'KL transform can be scale dependent only if space == kl_on'
 
     return
 

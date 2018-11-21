@@ -70,7 +70,6 @@ def run(args):
     if settings['method'] in ['kl_diag', 'kl_off_diag']:
         settings['n_kl'] = io.read_param(path['params'], 'n_kl', type='int')
         settings['kl_scale_dep'] = io.read_param(path['params'], 'kl_scale_dep', type='bool')
-        settings['kl_on'] = io.read_param(path['params'], 'kl_on')
     if settings['method']=='kl_diag':
         is_diag = True
     else:
@@ -125,7 +124,6 @@ def run(args):
     # TODO:for now implemented only:
     # - sampler = emcee, single_point
     # - kl_scale_dep = no
-    # - kl_on = fourier
 
 
     # Compute how many simulations have to be used

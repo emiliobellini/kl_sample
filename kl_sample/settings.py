@@ -21,7 +21,6 @@ default_params = {
     'method'        : 'full',
     'n_kl'          : 7,
     'kl_scale_dep'  : False,
-    'kl_on'         : 'fourier',
     'n_sims'        : 'auto',
     'sampler'       : 'single_point',
     'n_walkers'     : 10,

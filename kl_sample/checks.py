@@ -89,8 +89,8 @@ def sanity_checks(cosmo, settings, path):
         assert test, 'Central value for ' + cosmo['names'][n] + ' is larger than the right bound!'
 
     # Check sampler options
-    test = settings['sampler'] in ['emcee', 'fisher', 'single_point']
-    assert test, 'sampler not recognized! Options: emcee, fisher, single_point'
+    test = settings['sampler'] in ['emcee', 'single_point']
+    assert test, 'sampler not recognized! Options: emcee, single_point'
     # Check space options
     test = settings['space'] in ['real', 'fourier']
     assert test, 'space not recognized! Options: real, fourier'
@@ -118,9 +118,6 @@ def sanity_checks(cosmo, settings, path):
         # Check n_threads
         test = settings['n_threads']>0
         assert test, 'n_threads should be at least 1!'
-    # Checks related to the fisher sampler
-    elif settings['sampler'] == 'fisher':
-        raise ValueError('Fisher not implemented yet!')
 
     # Check data existence
     with fits.open(path['data']) as hdul:

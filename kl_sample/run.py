@@ -1,14 +1,12 @@
 """
 
 This module contains the main function run, from where
-it is possible to run an MCMC (emcee), a Fisher matrix
-analysis (fisher) and evaluate the likelihood at one
-single point (single_point).
+it is possible to run an MCMC (emcee), or evaluate the
+likelihood at one single point (single_point).
 
 """
 
 import numpy as np
-import pyccl as ccl
 import io
 import cosmo as cosmo_tools
 import checks
@@ -19,21 +17,19 @@ import sampler
 
 
 def run(args):
-    """ Run with different samplers: emcee, fisher, single_point
+    """ Run with different samplers: emcee, single_point
 
     Args:
         args: the arguments read by the parser.
 
     Returns:
-        saves to file the output (emcee, fisher) or just
+        saves to file the output (emcee) or just
         print on the screen the likelihood (single_point)
 
     """
 
 
     # ------------------- Initialize ------------------------------------------#
-
-    print ccl.__version__
 
     # Define absolute paths and check the existence of each required file
     path = {
@@ -64,8 +60,6 @@ def run(args):
         settings['n_walkers'] = io.read_param(path['params'], 'n_walkers', type='int')
         settings['n_steps'] = io.read_param(path['params'], 'n_steps', type='int')
         settings['n_threads'] = io.read_param(path['params'], 'n_threads', type='int')
-    elif settings['sampler'] == 'fisher':
-        raise ValueError('Fisher not implemented yet!')
     # KL settings
     if settings['method'] in ['kl_diag', 'kl_off_diag']:
         settings['n_kl'] = io.read_param(path['params'], 'n_kl', type='int')
@@ -110,7 +104,10 @@ def run(args):
         data['corr_obs'] = rsh.clean_cl(cl_EE, noise_EE)
         data['corr_sim'] = rsh.clean_cl(sims_EE, noise_EE)
     if settings['method'] in ['kl_diag', 'kl_off_diag']:
-        data['kl_t'] = io.read_from_fits(path['data'], 'kl_t')
+        if settings['kl_scale_dep']:
+            data['kl_t'] = io.read_from_fits(path['data'], 'kl_t_ell')
+        else:
+            data['kl_t'] = io.read_from_fits(path['data'], 'kl_t')
 
     # Add some dimension to settings (n_bins, n_x_var)
     settings['n_fields'] = data['corr_sim'].shape[0]
@@ -121,9 +118,6 @@ def run(args):
 
 
     # ------------------- Preliminary computations ----------------------------#
-    # TODO:for now implemented only:
-    # - sampler = emcee, single_point
-    # - kl_scale_dep = no
 
 
     # Compute how many simulations have to be used
@@ -184,8 +178,6 @@ def run(args):
 
     if settings['sampler'] == 'emcee':
         sampler.run_emcee(args, cosmo, data, settings, path)
-    elif settings['sampler'] == 'fisher':
-        sampler.run_fisher(cosmo, data, settings, path)
     elif settings['sampler'] == 'single_point':
         sampler.run_single_point(cosmo, data, settings)
 

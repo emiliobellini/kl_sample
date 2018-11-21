@@ -142,7 +142,11 @@ def debin_cl(cl, bp):
     return cl_dbp
 
 def bin_cl(cl, bp):
-    if cl.shape[-3] < bp[-1,-1]+1:
+    if cl.shape[-3] == bp[-1,-1]-bp[0,0]:
+        ell_min = bp[0,0]
+    elif cl.shape[-3] == bp[-1,-1]+1:
+        ell_min = 0
+    else:
         raise ValueError('Bandpowers and Cl shape mismatch!')
     new_shape = list(cl.shape)
     new_shape[-3] = bp.shape[0]
@@ -151,7 +155,7 @@ def bin_cl(cl, bp):
     cl_bp = np.moveaxis(cl_bp,[-3],[0])
     for count, range in enumerate(bp):
         cl_re = np.moveaxis(cl,[-3],[0])
-        cl_bp[count] = np.average(cl_re[range[0]:range[1]],axis=0)
+        cl_bp[count] = np.average(cl_re[range[0]-ell_min:range[1]-ell_min],axis=0)
     cl_bp = np.moveaxis(cl_bp,[0],[-3])
     return cl_bp
 

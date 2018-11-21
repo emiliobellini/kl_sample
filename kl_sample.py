@@ -10,7 +10,7 @@ b - prep_fourier: prepare data in fourier space and store
     no longer needed to rerun it;
 c - run: given the data (either in real or fourier space)
     and some additional input parameter do the actual run.
-    Implemented samplers: emcee, fisher or single_point
+    Implemented samplers: emcee or single_point
 """
 
 import sys

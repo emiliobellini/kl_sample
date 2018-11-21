@@ -101,7 +101,7 @@ def select_sims(data, settings):
 
 # ------------------- KL related ----------------------------------------------#
 
-def compute_kl(params, pz, noise, ell_min=2, ell_max=2000, scale_dep=False):
+def compute_kl(params, pz, noise, ell_min=2, ell_max=2000, scale_dep=False, bp=None):
     """ Compute the KL transform.
 
     Args:
@@ -144,11 +144,11 @@ def compute_kl(params, pz, noise, ell_min=2, ell_max=2000, scale_dep=False):
     E = np.array([(E[x].T*signs[x]).T for x in range(len(S))])
 
     # Test if the transformation matrix gives the correct new Cl's
-    checks.kl_consistent(E, S, noise, L, eigval, 1.e-12)
+    checks.kl_consistent(E, S, N, L, eigval, 1.e-12)
 
     # Return either the scale dependent or independent KL transform
     if scale_dep:
-        return E
+        return rsh.bin_cl(E, bp)
 
     else:
         E_avg = np.zeros((len(E[0]),len(E[0])))
@@ -173,8 +173,17 @@ def apply_kl(kl_t, corr, settings):
 
     """
 
+    kl_t_T = np.moveaxis(kl_t,[-1],[-2])
+
     # Apply KL transform
-    corr_kl = kl_t.dot(corr).dot(kl_t.T)
+    corr_kl = np.dot(kl_t,corr)
+    if settings['kl_scale_dep']:
+        corr_kl = np.diagonal(corr_kl,axis1=0,axis2=-2)
+        corr_kl = np.moveaxis(corr_kl,[-1],[-2])
+    corr_kl = np.dot(corr_kl,kl_t_T)
+    if settings['kl_scale_dep']:
+        corr_kl = np.diagonal(corr_kl,axis1=-3,axis2=-2)
+        corr_kl = np.moveaxis(corr_kl,[-1],[-2])
     corr_kl = np.moveaxis(corr_kl,[0],[-2])
 
     # Reduce dimensions of the array

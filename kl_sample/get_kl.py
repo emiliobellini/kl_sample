@@ -38,9 +38,6 @@ def get_kl(args):
     params_val = io.read_cosmo_array(path['params'], params_name)[:,1]
 
 
-    # Read and store the remaining parameters
-    scale_dep = io.read_param(path['params'], 'kl_scale_dep', type='bool')
-
     # Read photo_z
     pz = io.read_from_fits(path['data'], 'PHOTO_Z')
 
@@ -67,11 +64,11 @@ def get_kl(args):
 
     # ------------------- Compute KL ----------------------------#
 
-    # ell_max = 200
-    kl_t = lkl.compute_kl(params_val, pz, noise, ell_min=ell_min, ell_max=ell_max, scale_dep=scale_dep)
-
+    kl_t = lkl.compute_kl(params_val, pz, noise, ell_min=ell_min, ell_max=ell_max, scale_dep=False)
     io.write_to_fits(fname=path['data'], array=kl_t, name='kl_t')
 
+    kl_t = lkl.compute_kl(params_val, pz, noise, ell_min=ell_min, ell_max=ell_max, scale_dep=True, bp=ell_bp)
+    io.write_to_fits(fname=path['data'], array=kl_t, name='kl_t_ell')
 
     io.print_info_fits(path['data'])
 

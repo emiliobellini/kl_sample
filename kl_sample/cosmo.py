@@ -181,7 +181,6 @@ def get_theory(var, full, mask, data, settings):
         nf = settings['n_fields']
         nb = settings['n_bins']
         corr = rsh.couple_decouple_cl(ell, corr, settings['mcm'], nf, nb, len(bp))
-        corr = rsh.unify_fields_cl(corr, data['cov_pf'])
 
     # Apply KL
     if settings['method'] in ['kl_off_diag', 'kl_diag']:
@@ -196,6 +195,7 @@ def get_theory(var, full, mask, data, settings):
         corr = rsh.flatten_xipm(corr, settings)
         corr = rsh.mask_xipm(corr, data['mask_theta_ell'], settings)
     else:
+        corr = rsh.unify_fields_cl(corr, data['cov_pf'], is_diag=is_diag)
         corr = rsh.mask_cl(corr, is_diag=is_diag)
         corr = rsh.flatten_cl(corr, is_diag=is_diag)
 

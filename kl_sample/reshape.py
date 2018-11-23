@@ -97,9 +97,9 @@ def unflatten_covmat(cov, cl_shape, is_diag=False):
 def get_covmat_cl(sims, is_diag=False):
     sims_flat = flatten_cl(sims, is_diag)
     if len(sims_flat.shape) == 2:
-        cov = np.cov(sims_flat.T)
+        cov = np.cov(sims_flat.T,bias=True)
     elif len(sims_flat.shape) == 3:
-        cov = np.array([np.cov(x.T) for x in sims_flat])
+        cov = np.array([np.cov(x.T,bias=True) for x in sims_flat])
     else:
         raise ValueError('Input dimensions can be either 2 or 3, found {}'.format(len(sims_flat.shape)))
     if is_diag:
@@ -109,15 +109,15 @@ def get_covmat_cl(sims, is_diag=False):
     return unflatten_covmat(cov, shape, is_diag)
 
 
-def unify_fields_cl(cl, cov_pf):
-    cl_flat = flatten_cl(cl)
-    cov = flatten_covmat(cov_pf)
+def unify_fields_cl(cl, cov_pf, is_diag=False):
+    cl_flat = flatten_cl(cl, is_diag)
+    cov = flatten_covmat(cov_pf, is_diag)
     inv_cov = np.array([np.linalg.inv(x) for x in cov])
     tot_inv_cov = np.sum(inv_cov,axis=0)
-    tot_cl = np.array([np.dot(inv_cov[x], cl_flat[x].T) for x in range(len(cl))])
+    tot_cl = np.array([np.linalg.solve(cov[x], cl_flat[x].T) for x in range(len(cl))])
     tot_cl = np.sum(tot_cl, axis=0)
-    tot_cl = np.dot(np.linalg.inv(tot_inv_cov), tot_cl).T
-    tot_cl = unflatten_cl(tot_cl, cl.shape[1:])
+    tot_cl = np.linalg.solve(tot_inv_cov, tot_cl).T
+    tot_cl = unflatten_cl(tot_cl, cl.shape[1:], is_diag=is_diag)
     return tot_cl
 
 def debin_cl(cl, bp):

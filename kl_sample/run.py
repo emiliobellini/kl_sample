@@ -130,21 +130,19 @@ def run(args):
     # ------------------- Preliminary computations ----------------------------#
 
 
+    # Apply KL
+    if settings['method'] in ['kl_off_diag', 'kl_diag']:
+        data['corr_obs'] = lkl.apply_kl(data['kl_t'], data['corr_obs'], settings)
+        data['corr_sim'] = lkl.apply_kl(data['kl_t'], data['corr_sim'], settings)
+
+
     # Compute how many simulations have to be used
     settings['n_sims'] = lkl.how_many_sims(settings['n_sims'], settings['n_sims_tot'], settings['n_data'], settings['n_data_tot'])
     data['corr_sim'] = lkl.select_sims(data, settings)
     if settings['space']=='fourier':
-        data['cov_pf'] = rsh.get_covmat_cl(data['corr_sim'])
-        data['corr_obs'] = rsh.unify_fields_cl(data['corr_obs'], data['cov_pf'])
-        data['corr_sim'] = rsh.unify_fields_cl(data['corr_sim'], data['cov_pf'])
-
-
-    # If KL
-    if settings['method'] in ['kl_off_diag', 'kl_diag']:
-        # Apply KL to observed correlation function
-        data['corr_obs'] = lkl.apply_kl(data['kl_t'], data['corr_obs'], settings)
-        # Apply KL to simulated correlation functions
-        data['corr_sim'] = lkl.apply_kl(data['kl_t'], data['corr_sim'], settings)
+        data['cov_pf'] = rsh.get_covmat_cl(data['corr_sim'],is_diag=is_diag)
+        data['corr_obs'] = rsh.unify_fields_cl(data['corr_obs'], data['cov_pf'], is_diag=is_diag)
+        data['corr_sim'] = rsh.unify_fields_cl(data['corr_sim'], data['cov_pf'], is_diag=is_diag)
 
 
     # Prepare data if real

@@ -96,9 +96,6 @@ def unflatten_covmat(cov, cl_shape, is_diag=False):
 
 def get_covmat_cl(sims, is_diag=False):
     sims_flat = flatten_cl(sims, is_diag)
-    ns = sims_flat.shape[-2]
-    nd = sims_flat.shape[-1]
-    factor = (ns-1.)/(ns-nd-2.)
     if len(sims_flat.shape) == 2:
         cov = np.cov(sims_flat.T)
     elif len(sims_flat.shape) == 3:
@@ -109,7 +106,7 @@ def get_covmat_cl(sims, is_diag=False):
         shape = sims.shape[-2:]
     else:
         shape = sims.shape[-3:]
-    return factor*unflatten_covmat(cov, shape, is_diag)
+    return unflatten_covmat(cov, shape, is_diag)
 
 
 def unify_fields_cl(cl, cov_pf):

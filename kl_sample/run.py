@@ -115,13 +115,23 @@ def run(args):
     settings['n_bins'] = len(data['photo_z']) - 1
     settings['n_theta_ell'] = len(data['theta_ell'])
 
+    # Calculate number of elements in data vector
+    settings['n_data'] = len(data['mask_theta_ell'].flatten()[data['mask_theta_ell'].flatten()])
+    settings['n_data_tot'] = settings['n_data']*settings['n_bins']*(settings['n_bins']+1)/2
+    if settings['method'] == 'kl_diag':
+        settings['n_data'] = settings['n_data']*settings['n_kl']
+    elif settings['method'] == 'kl_off_diag':
+        settings['n_data'] = settings['n_data']*settings['n_kl']*(settings['n_kl']+1)/2
+    else:
+        settings['n_data'] = settings['n_data']*settings['n_bins']*(settings['n_bins']+1)/2
+
 
 
     # ------------------- Preliminary computations ----------------------------#
 
 
     # Compute how many simulations have to be used
-    settings['n_sims'] = lkl.how_many_sims(data, settings)
+    settings['n_sims'] = lkl.how_many_sims(settings['n_sims'], settings['n_sims_tot'], settings['n_data'], settings['n_data_tot'])
     data['corr_sim'] = lkl.select_sims(data, settings)
     if settings['space']=='fourier':
         data['cov_pf'] = rsh.get_covmat_cl(data['corr_sim'])
@@ -169,7 +179,8 @@ def run(args):
         data['corr_sim'] = rsh.mask_cl(data['corr_sim'], is_diag=is_diag)
         cov = rsh.get_covmat_cl(data['corr_sim'], is_diag=is_diag)
         cov = rsh.flatten_covmat(cov, is_diag=is_diag)
-        data['inv_cov_mat'] = np.linalg.inv(cov)
+        factor = (settings['n_sims']-settings['n_data']-2.)/(settings['n_sims']-1.)
+        data['inv_cov_mat'] = factor*np.linalg.inv(cov)
 
 
 

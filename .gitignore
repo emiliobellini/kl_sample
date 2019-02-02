@@ -111,3 +111,5 @@ output/*
 *.sh.sh
 python.sh
 .bashrc
+*~
+*.npz

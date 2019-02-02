@@ -6,7 +6,7 @@ to compute and manipulate cosmology.
 Functions:
  - get_cosmo_mask(params)
  - get_cosmo_ccl(params)
- - get_cls_ccl(cosmo, pz, ell_max)
+ - get_cls_ccl(params, cosmo, pz, ell_max)
  - get_xipm_ccl(cosmo, cls, theta)
 
 """
@@ -15,6 +15,7 @@ import numpy as np
 import pyccl as ccl
 import reshape as rsh
 import likelihood as lkl
+import settings as set
 
 
 
@@ -68,7 +69,7 @@ def get_cosmo_ccl(params):
     return cosmo
 
 
-def get_cls_ccl(cosmo, pz, ell_max):
+def get_cls_ccl(params, cosmo, pz, ell_max, add_ia=False):
     """ Get theory Cl's.
 
     Args:
@@ -85,12 +86,33 @@ def get_cls_ccl(cosmo, pz, ell_max):
     n_bins = len(pz)-1
     n_ells = ell_max+1
 
-    # Tracers
-    lens = np.array([
-        ccl.WeakLensingTracer(
-            cosmo,
-            dndz=(pz[0].astype(np.float64),pz[1:][x].astype(np.float64))
-        ) for x in range(n_bins)])
+    # z and pz
+    z = pz[0].astype(np.float64)
+    prob_z = pz[1:].astype(np.float64)
+
+    # If add_ia
+    if add_ia:
+        f_z = np.ones(len(z))
+        # Bias
+        Omega_m = (params[1]+params[2])/params[0]**2.
+        D_z = ccl.background.growth_factor(cosmo, 1./(1.+z))
+        b_z = -params[5]*set.C_1*set.RHO_CRIT*Omega_m/D_z
+        b_z = np.outer(set.L_I_OVER_L_0**params[6], b_z)
+        # Tracers
+        lens = np.array([
+            ccl.WeakLensingTracer(
+                cosmo,
+                dndz=(z,prob_z[x]),
+                ia_bias=(z,b_z[x]),
+                red_frac=(z,f_z),
+            ) for x in range(n_bins)])
+    else:
+        # Tracers
+        lens = np.array([
+            ccl.WeakLensingTracer(
+                cosmo,
+                dndz=(z,prob_z[x])
+            ) for x in range(n_bins)])
 
     # Cl's
     ell = np.arange(n_ells)
@@ -172,7 +194,7 @@ def get_theory(var, full, mask, data, settings):
 
     # Get corr
     cosmo = get_cosmo_ccl(pars)
-    corr = get_cls_ccl(cosmo, pz, ell_max)
+    corr = get_cls_ccl(pars, cosmo, pz, ell_max, add_ia=settings['add_ia'])
     if settings['space'] == 'real':
         corr = get_xipm_ccl(cosmo, corr, theta)
     else:

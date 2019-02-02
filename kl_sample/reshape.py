@@ -156,11 +156,12 @@ def bin_cl(cl, bp):
     cl_bp = np.moveaxis(cl_bp,[0],[-3])
     return cl_bp
 
-def couple_decouple_cl(ell, cl, mcm_path, n_fields, n_bins, n_bp):
+def couple_decouple_cl(ell, cl, mcm_path, n_fields, n_bins, n_bp, return_BB=False):
     nmt_cl = np.moveaxis(cl,[0],[-1])
     nmt_cl = np.stack((nmt_cl,np.zeros(nmt_cl.shape),np.zeros(nmt_cl.shape),np.zeros(nmt_cl.shape)))
     nmt_cl = np.moveaxis(nmt_cl,[0],[-2])
     final_cl = np.zeros((n_fields, n_bins, n_bins, n_bp))
+    final_cl_BB = np.zeros((n_fields, n_bins, n_bins, n_bp))
     for nb1 in range(n_bins):
         for nb2 in range(nb1,n_bins):
             for nf in range(n_fields):
@@ -170,8 +171,14 @@ def couple_decouple_cl(ell, cl, mcm_path, n_fields, n_bins, n_bp):
                 cl_pfb = wf.decouple_cell(cl_pfb)
                 final_cl[nf, nb1, nb2] = cl_pfb[0]
                 final_cl[nf, nb2, nb1] = cl_pfb[0]
+                final_cl_BB[nf, nb1, nb2] = cl_pfb[-1]
+                final_cl_BB[nf, nb2, nb1] = cl_pfb[-1]
     final_cl = np.moveaxis(final_cl,[-1],[-3])
-    return final_cl
+    final_cl_BB = np.moveaxis(final_cl_BB,[-1],[-3])
+    if return_BB :
+        return final_cl,final_cl_BB
+    else :
+        return final_cl
 
 
 # ------------------- Flatten and unflatten correlation function --------------#

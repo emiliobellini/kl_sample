@@ -175,13 +175,15 @@ def read_param(fname, par, type='string'):
                     _ , value = line.split('=')
                     value = value.strip()
 
-    # If there are duplicated parameters raise an error
+   # If there are duplicated parameters raise an error
     if n_par>1:
         raise IOError('Found duplicated parameter: ' + par)
 
     # If par was not in the file use the default value
     if value is None:
         value = set.default_params[par]
+        if type == 'bool':
+            return value
         print('Default value used for ' + par + ' = ' + str(value))
         sys.stdout.flush()
 

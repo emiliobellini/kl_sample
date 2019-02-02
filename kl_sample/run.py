@@ -42,8 +42,12 @@ def run(args):
 
 
     # Create array with cosmo parameters
+    add_ia = io.read_param(path['params'], 'add_ia', type='bool')
     cosmo = {}
-    cosmo['names']  = ['h', 'omega_c', 'omega_b', 'ln10_A_s', 'n_s']
+    if add_ia:
+        cosmo['names']  = ['h', 'omega_c', 'omega_b', 'ln10_A_s', 'n_s', 'A_IA', 'beta_IA']
+    else:
+        cosmo['names']  = ['h', 'omega_c', 'omega_b', 'ln10_A_s', 'n_s']
     cosmo['params'] = io.read_cosmo_array(path['params'], cosmo['names'])
     cosmo['mask']   = cosmo_tools.get_cosmo_mask(cosmo['params'])
 
@@ -53,7 +57,8 @@ def run(args):
         'sampler' : io.read_param(path['params'], 'sampler'),
         'space' : io.read_param(path['params'], 'space'),
         'method' : io.read_param(path['params'], 'method'),
-        'n_sims' : io.read_param(path['params'], 'n_sims')
+        'n_sims' : io.read_param(path['params'], 'n_sims'),
+        'add_ia' : add_ia
     }
     # Sampler settings
     if settings['sampler'] == 'emcee':

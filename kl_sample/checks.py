@@ -81,11 +81,12 @@ def sanity_checks(cosmo, settings, path):
         # Check that the central value is a number
         test = par[1] is not None
         assert test, 'Central value for ' + cosmo['names'][n] + ' is None!'
+        # If left and right are the same the prior is considered Gaussian
         # Check that the left bound is either None or smaller than central
-        test = par[0] is None or par[0]<=par[1]
+        test = par[0] is None or par[0]<=par[1] or par[0]==par[2]
         assert test, 'Central value for ' + cosmo['names'][n] + ' is lower than the left bound!'
         # Check that the right bound is either None or larger than central
-        test = par[2] is None or par[1]<=par[2]
+        test = par[2] is None or par[1]<=par[2] or par[0]==par[2]
         assert test, 'Central value for ' + cosmo['names'][n] + ' is larger than the right bound!'
 
     # Check sampler options

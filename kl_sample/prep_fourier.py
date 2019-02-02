@@ -671,10 +671,12 @@ def prep_fourier(args):
 
         # Initialize quantities
         n_eff = np.zeros(len(z_bins))
+        area = np.zeros(len(z_bins))
         sigma_g = np.zeros(len(z_bins))
         photo_z = np.zeros((len(z_bins)+1,len(pz_full[0])))
         photo_z[0] = (np.arange(len(pz_full[0]))+1./2.)*set.dZ_CFHTlens
         n_eff_f = np.zeros((len(fields),len(z_bins)))
+        area_f = np.zeros((len(fields),len(z_bins)))
         sigma_g_f = np.zeros((len(fields),len(z_bins)))
         photo_z_f = np.zeros((len(fields),len(z_bins)+1,len(pz_full[0])))
         for count in range(len(fields)):
@@ -693,8 +695,8 @@ def prep_fourier(args):
             gals = cat[sel]
             pz_z = pz_full[sel]
             # Get n_eff
-            area = get_area(fields)
-            n_eff[n_z_bin] = get_n_eff(gals, area)
+            area[n_z_bin] = get_area(fields)
+            n_eff[n_z_bin] = get_n_eff(gals, area[n_z_bin])
             # Get sigma_g
             sigma_g[n_z_bin] = get_sigma_g(gals)
             # Get photo_z
@@ -707,8 +709,8 @@ def prep_fourier(args):
                 gals = cat[filter[f][n_z_bin]]
                 pz_z = pz_full[filter[f][n_z_bin]]
                 # Get n_eff
-                area = get_area([f])
-                n_eff_f[count,n_z_bin] = get_n_eff(gals, area)
+                area_f[count,n_z_bin] = get_area([f])
+                n_eff_f[count,n_z_bin] = get_n_eff(gals, area_f[count,n_z_bin])
                 # Get sigma_g
                 sigma_g_f[count,n_z_bin] = get_sigma_g(gals)
                 # Get photo_z
@@ -726,6 +728,8 @@ def prep_fourier(args):
         warning = io.write_to_fits(path['photo_z'], photo_z_f, 'PHOTO_Z_PF', type='image') or warning
         warning = io.write_to_fits(path['photo_z'], n_eff_f, 'N_EFF_PF', type='image') or warning
         warning = io.write_to_fits(path['photo_z'], sigma_g_f, 'SIGMA_G_PF', type='image') or warning
+        warning = io.write_to_fits(path['photo_z'], area, 'AREA', type='image') or warning
+        warning = io.write_to_fits(path['photo_z'], area_f, 'AREA_PF', type='image') or warning
 
         # Generate plots
         if args.want_plots:

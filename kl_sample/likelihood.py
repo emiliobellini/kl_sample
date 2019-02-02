@@ -99,7 +99,7 @@ def compute_kl(params, pz, noise, ell_min=2, ell_max=2000, scale_dep=False, bp=N
 
     # Compute theory Cl's (S = signal)
     cosmo_ccl = cosmo_tools.get_cosmo_ccl(params)
-    S = cosmo_tools.get_cls_ccl(cosmo_ccl, pz, ell_max)
+    S = cosmo_tools.get_cls_ccl(params, cosmo_ccl, pz, ell_max)
     S = S[ell_min:ell_max+1]
 
     # Cholesky decomposition of noise (N=LL^+)
@@ -228,11 +228,17 @@ def lnprior(var, full, mask):
 
     """
 
-    is_in = (full[mask][:,0] <= var).all()
-    is_in = is_in*(var <= full[mask][:,2]).all()
+    var_uni = var[full[mask][:,0]!=full[mask][:,2]]
+    var_gauss = var[full[mask][:,0]==full[mask][:,2]]
+    uni = full[mask][full[mask][:,0]!=full[mask][:,2]]
+    gauss = full[mask][full[mask][:,0]==full[mask][:,2]]
+
+    is_in = (uni[:,0] <= var_uni).all()
+    is_in = is_in*(var_uni <= uni[:,2]).all()
 
     if is_in:
-        return 0.0
+        lp = (var_gauss-gauss[:,1])**2./2./gauss[:,0]**2.
+        return lp.sum()
     return -np.inf
 
 

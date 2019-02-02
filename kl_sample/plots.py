@@ -35,8 +35,11 @@ def plots(args):
     # Read data
     ell = io.read_from_fits(path['fourier'], 'ELL')
     cl_EE = io.read_from_fits(path['fourier'], 'CL_EE')
+    cl_BB = io.read_from_fits(path['fourier'], 'CL_BB')
     noise_EE = io.read_from_fits(path['fourier'], 'CL_EE_NOISE')
+    noise_BB = io.read_from_fits(path['fourier'], 'CL_BB_NOISE')
     sims_EE = io.read_from_fits(path['fourier'], 'CL_SIM_EE')
+    sims_BB = io.read_from_fits(path['fourier'], 'CL_SIM_BB')
     pz = io.read_from_fits(path['fourier'], 'PHOTO_Z')
     n_eff = io.read_from_fits(path['fourier'], 'N_EFF')
     sigma_g = io.read_from_fits(path['fourier'], 'SIGMA_G')
@@ -48,6 +51,8 @@ def plots(args):
     # Clean data from noise
     cl_EE = rsh.clean_cl(cl_EE, noise_EE)
     sims_EE = rsh.clean_cl(sims_EE, noise_EE)
+    cl_BB = rsh.clean_cl(cl_BB, noise_BB)
+    sims_BB = rsh.clean_cl(sims_BB, noise_BB)
 
     # Create array with cosmo parameters
     params_name = ['h', 'omega_c', 'omega_b', 'ln10_A_s', 'n_s']
@@ -57,23 +62,44 @@ def plots(args):
     bp = set.BANDPOWERS
     n_bins = len(bp)
     cosmo = cosmo_tools.get_cosmo_ccl(params_val)
-    th_cl = cosmo_tools.get_cls_ccl(cosmo, pz, bp[-1,-1])
+    th_cl = cosmo_tools.get_cls_ccl(params_val, cosmo, pz, bp[-1,-1])
+
+    from astropy.io import fits
+    d=fits.open("/users/groups/damongebellini/data/preliminary/7bins/cls_bf.fits")
+    cl_ee=d[2].data[:len(th_cl)]
+
     # th_cl = rsh.bin_cl(th_cl, bp)
     tot_ell = np.arange(bp[-1,-1]+1)
-    th_cl = rsh.couple_decouple_cl(tot_ell, th_cl, path['mcm'], len(fields), n_bins, len(bp))
+    th_cl,th_cl_BB = rsh.couple_decouple_cl(tot_ell, th_cl, path['mcm'], len(fields), n_bins, len(bp),
+                                            return_BB=True)
+    th_clb,th_cl_BBb = rsh.couple_decouple_cl(tot_ell, cl_ee, path['mcm'], len(fields), n_bins, len(bp),
+                                              return_BB=True)
     cov_pf = rsh.get_covmat_cl(sims_EE)
+    cov_pf_BB = rsh.get_covmat_cl(sims_BB)
     th_cl = rsh.unify_fields_cl(th_cl, cov_pf)
+    th_cl_BB = rsh.unify_fields_cl(th_cl_BB, cov_pf_BB)
+    th_clb = rsh.unify_fields_cl(th_clb, cov_pf)
+    th_cl_BBb = rsh.unify_fields_cl(th_cl_BBb, cov_pf_BB)
 
     # Unify fields
     cl_EE = rsh.unify_fields_cl(cl_EE, cov_pf)
     noise_EE = rsh.unify_fields_cl(noise_EE, cov_pf)
     sims_EE = rsh.unify_fields_cl(sims_EE, cov_pf)
+    cl_BB = rsh.unify_fields_cl(cl_BB, cov_pf_BB)
+    noise_BB = rsh.unify_fields_cl(noise_BB, cov_pf_BB)
+    sims_BB = rsh.unify_fields_cl(sims_BB, cov_pf_BB)
 
     # Average simulations
     sims_EE_avg = np.average(sims_EE, axis=0)
+    sims_BB_avg = np.average(sims_BB, axis=0)
 
     # Calculate covmat
     covmat_EE = rsh.get_covmat_cl(sims_EE)
+    covmat_BB = rsh.get_covmat_cl(sims_BB)
+    np.savez("cls_all",dd_EE=cl_EE,dd_BB=cl_BB,
+             tt_EE=th_cl,tt_BB=th_cl_BB,tb_EE=th_clb,tb_BB=th_cl_BBb,
+             ss_EE=sims_EE,ss_BB=sims_BB,cv_EE=covmat_EE,cv_BB=covmat_BB)
+    exit(1)
 
 
     # Noise based on n_eff and sigma_g

@@ -17,6 +17,8 @@ default_params = {
     'omega_b'       : [ 0.013,    0.03274485,    0.033],
     'ln10_A_s'      : [   2.3,    2.47363700,      5.0],
     'n_s'           : [   0.7,    1.25771300,      1.3],
+    'A_IA'          : [  -6.0,    0.00000000,      6.0],
+    'beta_IA'       : [  0.25,    1.13000000,     0.25],
     'ell_max'       : 2000,
     'method'        : 'full',
     'n_kl'          : 7,
@@ -28,7 +30,8 @@ default_params = {
     'space'         : 'real',
     'data'          : 'data/data_real.fits',
     'output'        : 'output/test/test.txt',
-    'n_threads'     : 2
+    'n_threads'     : 2,
+    'add_ia'        : False
 }
 
 
@@ -62,6 +65,12 @@ FIELDS_CFHTLENS = ['W'+str(x+1) for x in range(4)]
 dZ_CFHTlens = 0.05
 A_CFHTlens = np.array([42.90, 12.10, 26.10, 13.30])*(60.**2.) #in arcmin^-2
 A_sims = np.array([12.72, 10.31, 12.01, 10.38])*(60.**2.) #in arcmin^-2
+
+
+# Parameters for Intrinsic Alignment
+RHO_CRIT = 2.77536627e11
+C_1 = 5.e-14
+L_I_OVER_L_0 = np.array([0.017, 0.069, 0.15, 0.22, 0.36, 0.49, 0.77])
 
 
 # Criteria used to select the data

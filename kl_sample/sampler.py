@@ -110,8 +110,11 @@ def run_single_point(cosmo, data, settings):
     print '----> Omega_b h^2   = ' + '{0:2.4e}'.format(full[2,1])
     print '----> ln(10^10 A_s) = ' + '{0:2.4e}'.format(full[3,1])
     print '----> n_s           = ' + '{0:2.4e}'.format(full[4,1])
-    print '----> A_IA          = ' + '{0:2.4e}'.format(full[5,1])
-    print '----> beta_IA       = ' + '{0:2.4e}'.format(full[6,1])
+    print '----> w_0           = ' + '{0:2.4e}'.format(full[5,1])
+    print '----> w_A           = ' + '{0:2.4e}'.format(full[6,1])
+    if settings['add_ia']:
+        print '----> A_IA          = ' + '{0:2.4e}'.format(full[7,1])
+        print '----> beta_IA       = ' + '{0:2.4e}'.format(full[8,1])
     print 'Derived parameters:'
     print '----> sigma_8       = ' + '{0:2.4e}'.format(sigma8)
     print 'Likelihood:'

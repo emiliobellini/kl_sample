@@ -2,12 +2,13 @@ import os
 import sys
 import numpy as np
 import matplotlib
-# matplotlib.use('Agg')
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import io
 import reshape as rsh
 import settings as set
 import cosmo as cosmo_tools
+import likelihood as lkl
 
 
 def plots(args):
@@ -31,6 +32,13 @@ def plots(args):
     path['real'] = io.path_exists_or_error('{}/data/data_real.fits'.format(sys.path[0]))
     path['output'] = io.path_exists_or_create(os.path.abspath(args.output_path))+'/'
 
+    # Settings
+    settings = {
+            'kl_scale_dep' : True,
+            'method' : 'kl_diag',
+            'n_kl' : 7
+        }
+
 
     # Read data
     ell = io.read_from_fits(path['fourier'], 'ELL')
@@ -46,6 +54,8 @@ def plots(args):
     pz_r = io.read_from_fits(path['real'], 'PHOTO_Z')
     n_eff_r = io.read_from_fits(path['real'], 'N_EFF')
     sigma_g_r = io.read_from_fits(path['real'], 'SIGMA_G')
+    kl_t = io.read_from_fits(path['fourier'], 'KL_T_ELL')
+#    io.print_info_fits(path['fourier'])
 
 
     # Clean data from noise
@@ -54,8 +64,24 @@ def plots(args):
     cl_BB = rsh.clean_cl(cl_BB, noise_BB)
     sims_BB = rsh.clean_cl(sims_BB, noise_BB)
 
+    cl_EE_kl = lkl.apply_kl(kl_t, cl_EE, settings)
+    sims_EE_kl = lkl.apply_kl(kl_t, sims_EE, settings)
+    cov_pf_kl = rsh.get_covmat_cl(sims_EE_kl,is_diag=True)
+    cl_EE_kl = rsh.unify_fields_cl(cl_EE_kl, cov_pf_kl, is_diag=True)
+    sims_EE_kl = rsh.unify_fields_cl(sims_EE_kl, cov_pf_kl, is_diag=True)
+
+    # Mask observed Cl's
+#    cl_EE_kl = rsh.mask_cl(cl_EE_kl, is_diag=True)
+
+    # Calculate covmat Cl's
+#    sims_EE_kl = rsh.mask_cl(sims_EE_kl, is_diag=True)
+    cov_kl = rsh.get_covmat_cl(sims_EE_kl, is_diag=True)
+    factor = (2000.-35.-2.)/(2000.-1.)
+    cov_kl = cov_kl/factor
+
+
     # Create array with cosmo parameters
-    params_name = ['h', 'omega_c', 'omega_b', 'ln10_A_s', 'n_s']
+    params_name = ['h', 'omega_c', 'omega_b', 'ln10_A_s', 'n_s', 'w_0', 'w_A']
     params_val = io.read_cosmo_array(path['params'], params_name)[:,1]
 
     # Get theory Cl's
@@ -74,6 +100,33 @@ def plots(args):
                                             return_BB=True)
     th_clb,th_cl_BBb = rsh.couple_decouple_cl(tot_ell, cl_ee, path['mcm'], len(fields), n_bins, len(bp),
                                               return_BB=True)
+
+    th_cl_kl = lkl.apply_kl(kl_t, th_cl, settings)
+    th_cl_kl = rsh.unify_fields_cl(th_cl_kl, cov_pf_kl, is_diag=True)
+
+    io.write_to_fits(fname=path['output']+'obs.fits', array=ell, name='ell')
+    io.write_to_fits(fname=path['output']+'obs.fits', array=cl_EE_kl, name='cl_EE_obs')
+    io.write_to_fits(fname=path['output']+'obs.fits', array=cov_kl, name='cov_obs')
+    io.write_to_fits(fname=path['output']+'obs.fits', array=th_cl_kl, name='cl_EE_th')
+    plt.figure()
+    x = ell
+    for b1 in range(3):
+        y1 = th_cl_kl[:,b1]
+        y2 = cl_EE_kl[:,b1]
+        err = np.sqrt(np.diag(cov_kl[:,:,b1,b1]))
+#        plt.plot(x, y1, label = '$\\sigma_g^2/n_{eff}$')
+        plt.errorbar(x, y2, yerr=err, label = 'Bin {}'.format(b1+1), fmt='o')
+        plt.errorbar(x, -y2, yerr=err, label = 'Bin {}'.format(b1+1), fmt='^')
+    plt.xscale('log')
+    plt.yscale('log')
+    plt.xlabel('$\\ell$')
+    plt.ylabel('$\\hat{C}_\\ell^{EE}$')
+    plt.legend(loc='best')
+    plt.savefig('{}cl_kl_data.pdf'.format(path['output']))
+    plt.close()
+
+    exit(1)
+
     cov_pf = rsh.get_covmat_cl(sims_EE)
     cov_pf_BB = rsh.get_covmat_cl(sims_BB)
     th_cl = rsh.unify_fields_cl(th_cl, cov_pf)
@@ -99,7 +152,6 @@ def plots(args):
     np.savez("cls_all",dd_EE=cl_EE,dd_BB=cl_BB,
              tt_EE=th_cl,tt_BB=th_cl_BB,tb_EE=th_clb,tb_BB=th_cl_BBb,
              ss_EE=sims_EE,ss_BB=sims_BB,cv_EE=covmat_EE,cv_BB=covmat_BB)
-    exit(1)
 
 
     # Noise based on n_eff and sigma_g

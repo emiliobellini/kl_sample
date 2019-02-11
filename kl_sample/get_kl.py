@@ -34,7 +34,7 @@ def get_kl(args):
 
 
     # Create array with cosmo parameters
-    params_name = ['h', 'omega_c', 'omega_b', 'ln10_A_s', 'n_s']
+    params_name = ['h', 'omega_c', 'omega_b', 'ln10_A_s', 'n_s', 'w_0', 'w_A']
     params_val = io.read_cosmo_array(path['params'], params_name)[:,1]
 
 

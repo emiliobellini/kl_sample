@@ -63,7 +63,9 @@ def get_cosmo_ccl(params):
         Omega_c  = params[1]/params[0]**2.,
         Omega_b  = params[2]/params[0]**2.,
         A_s      = (10.**(-10.))*np.exp(params[3]),
-        n_s      = params[4]
+        n_s      = params[4],
+        w0       = params[5],
+        wa       = params[6]
         )
 
     return cosmo
@@ -96,8 +98,8 @@ def get_cls_ccl(params, cosmo, pz, ell_max, add_ia=False):
         # Bias
         Omega_m = (params[1]+params[2])/params[0]**2.
         D_z = ccl.background.growth_factor(cosmo, 1./(1.+z))
-        b_z = -params[5]*set.C_1*set.RHO_CRIT*Omega_m/D_z
-        b_z = np.outer(set.L_I_OVER_L_0**params[6], b_z)
+        b_z = -params[7]*set.C_1*set.RHO_CRIT*Omega_m/D_z
+        b_z = np.outer(set.L_I_OVER_L_0**params[8], b_z)
         # Tracers
         lens = np.array([
             ccl.WeakLensingTracer(

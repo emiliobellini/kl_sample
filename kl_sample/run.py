@@ -45,9 +45,9 @@ def run(args):
     add_ia = io.read_param(path['params'], 'add_ia', type='bool')
     cosmo = {}
     if add_ia:
-        cosmo['names']  = ['h', 'omega_c', 'omega_b', 'ln10_A_s', 'n_s', 'A_IA', 'beta_IA']
+        cosmo['names']  = ['h', 'omega_c', 'omega_b', 'ln10_A_s', 'n_s', 'w_0', 'w_A', 'A_IA', 'beta_IA']
     else:
-        cosmo['names']  = ['h', 'omega_c', 'omega_b', 'ln10_A_s', 'n_s']
+        cosmo['names']  = ['h', 'omega_c', 'omega_b', 'ln10_A_s', 'n_s', 'w_0', 'w_A',]
     cosmo['params'] = io.read_cosmo_array(path['params'], cosmo['names'])
     cosmo['mask']   = cosmo_tools.get_cosmo_mask(cosmo['params'])
 

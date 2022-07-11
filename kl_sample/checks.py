@@ -14,7 +14,7 @@ import re
 import sys
 import numpy as np
 from astropy.io import fits
-import settings as set
+import kl_sample.settings as set
 
 
 

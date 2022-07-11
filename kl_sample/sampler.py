@@ -11,8 +11,8 @@ Functions:
 import sys
 import numpy as np
 import emcee
-import likelihood as lkl
-import cosmo as cosmo_tools
+import kl_sample.likelihood as lkl
+import kl_sample.cosmo as cosmo_tools
 
 
 # ------------------- emcee ---------------------------------------------------#
@@ -42,9 +42,9 @@ def run_emcee(args, cosmo, data, settings, path):
     nd = len(mask[mask])
 
     #Print useful stuff
-    print 'Starting the chains!'
+    print('Starting the chains!')
     for key in settings.keys():
-        print key + ' = ' + str(settings[key])
+        print(key + ' = ' + str(settings[key]))
     sys.stdout.flush()
 
     #Initialize sampler
@@ -72,7 +72,7 @@ def run_emcee(args, cosmo, data, settings, path):
             out = np.append(out, cosmo_tools.get_sigma_8(pos[k], full, mask))
             f.write('    '.join(['{0:.10e}'.format(x) for x in out]) + '\n')
         f.close()
-        print '----> Computed ' + '{0:5.1%}'.format(float(count+1) / ns) + ' of the steps'
+        print('----> Computed ' + '{0:5.1%}'.format(float(count+1) / ns) + ' of the steps')
         sys.stdout.flush()
 
     return
@@ -104,20 +104,20 @@ def run_single_point(cosmo, data, settings):
     post = lkl.lnprob(var, full, mask, data, settings)
     sigma8 = cosmo_tools.get_sigma_8(var, full, mask)
 
-    print 'Cosmological parameters:'
-    print '----> h             = ' + '{0:2.4e}'.format(full[0,1])
-    print '----> Omega_c h^2   = ' + '{0:2.4e}'.format(full[1,1])
-    print '----> Omega_b h^2   = ' + '{0:2.4e}'.format(full[2,1])
-    print '----> ln(10^10 A_s) = ' + '{0:2.4e}'.format(full[3,1])
-    print '----> n_s           = ' + '{0:2.4e}'.format(full[4,1])
-    print '----> w_0           = ' + '{0:2.4e}'.format(full[5,1])
-    print '----> w_A           = ' + '{0:2.4e}'.format(full[6,1])
+    print('Cosmological parameters:')
+    print('----> h             = ' + '{0:2.4e}'.format(full[0, 1]))
+    print('----> Omega_c h^2   = ' + '{0:2.4e}'.format(full[1, 1]))
+    print('----> Omega_b h^2   = ' + '{0:2.4e}'.format(full[2, 1]))
+    print('----> ln(10^10 A_s) = ' + '{0:2.4e}'.format(full[3, 1]))
+    print('----> n_s           = ' + '{0:2.4e}'.format(full[4, 1]))
+    print('----> w_0           = ' + '{0:2.4e}'.format(full[5, 1]))
+    print('----> w_A           = ' + '{0:2.4e}'.format(full[6, 1]))
     if settings['add_ia']:
-        print '----> A_IA          = ' + '{0:2.4e}'.format(full[7,1])
-        print '----> beta_IA       = ' + '{0:2.4e}'.format(full[8,1])
-    print 'Derived parameters:'
-    print '----> sigma_8       = ' + '{0:2.4e}'.format(sigma8)
-    print 'Likelihood:'
-    print '----> -ln(like)     = ' + '{0:4.4f}'.format(-post)
+        print('----> A_IA          = ' + '{0:2.4e}'.format(full[7, 1]))
+        print('----> beta_IA       = ' + '{0:2.4e}'.format(full[8, 1]))
+    print('Derived parameters:')
+    print('----> sigma_8       = ' + '{0:2.4e}'.format(sigma8))
+    print('Likelihood:')
+    print('----> -ln(like)     = ' + '{0:4.4f}'.format(-post))
 
     return

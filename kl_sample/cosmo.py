@@ -13,9 +13,9 @@ Functions:
 
 import numpy as np
 import pyccl as ccl
-import reshape as rsh
-import likelihood as lkl
-import settings as set
+import kl_sample.reshape as rsh
+import kl_sample.likelihood as lkl
+import kl_sample.settings as set
 
 
 
@@ -65,7 +65,8 @@ def get_cosmo_ccl(params):
         A_s      = (10.**(-10.))*np.exp(params[3]),
         n_s      = params[4],
         w0       = params[5],
-        wa       = params[6]
+        wa       = params[6],
+        transfer_function = 'boltzmann_class'
         )
 
     return cosmo

@@ -19,10 +19,10 @@ Functions:
 import numpy as np
 import random
 import sys
-import cosmo as cosmo_tools
-import checks
-import reshape as rsh
-import settings as set
+import kl_sample.cosmo as cosmo_tools
+import kl_sample.checks as checks
+import kl_sample.reshape as rsh
+import kl_sample.settings as set
 
 
 
@@ -260,11 +260,11 @@ def lnlike(var, full, mask, data, settings):
     try:
         th = cosmo_tools.get_theory(var, full, mask, data, settings)
     except Exception:
-        print 'CCL timeout with pars = ' + str(var)
+        print('CCL timeout with pars = ' + str(var))
         sys.stdout.flush()
         return -np.inf
     except:
-        print 'CCL failure with pars = ' + str(var)
+        print('CCL failure with pars = ' + str(var))
         sys.stdout.flush()
         return -np.inf
     signal.alarm(0)

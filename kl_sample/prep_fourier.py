@@ -19,9 +19,9 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from astropy.io import fits
 from astropy import wcs
-import settings as set
-import io
-import prep_fourier_tools as tools
+import kl_sample.settings as set
+import kl_sample.io as io
+import kl_sample.prep_fourier_tools as tools
 
 
 def prep_fourier(args):
@@ -112,80 +112,80 @@ def prep_fourier(args):
         nofile2 = np.array([not(os.path.exists(path['mask_sec_'+f])) for f in fields]).any()
         nofile3 = not(os.path.exists(path['cat_full']))
         if nofile1 or nofile2 or nofile3:
-            print 'WARNING: I will skip the MASK module. Input files not found!'
+            print('WARNING: I will skip the MASK module. Input files not found!')
             sys.stdout.flush()
             is_run_mask = False
             warning = True
     else:
-        print 'I will skip the MASK module. Output files already there!'
+        print('I will skip the MASK module. Output files already there!')
         sys.stdout.flush()
     if is_run_mult:
         nofile1 = np.array([not(os.path.exists(path['mask_'+f])) for f in fields]).any()
         nofile2 = not(os.path.exists(path['cat_full']))
         if (not(is_run_mask) and nofile1) or nofile2:
-            print 'WARNING: I will skip the MULT_CORR module. Input file not found!'
+            print('WARNING: I will skip the MULT_CORR module. Input file not found!')
             sys.stdout.flush()
             is_run_mult = False
             warning = True
     else:
-        print 'I will skip the MULT_CORR module. Output files already there!'
+        print('I will skip the MULT_CORR module. Output files already there!')
         sys.stdout.flush()
     if is_run_pz:
         nofile1 = np.array([not(os.path.exists(path['m_'+f])) for f in fields]).any()
         nofile2 = not(os.path.exists(path['cat_full']))
         nofile3 = np.array([not(os.path.exists(path['m_'+f])) for f in fields]).any()
         if (not(is_run_mask) and nofile1) or nofile2 or (not(is_run_mult) and nofile3):
-            print 'WARNING: I will skip the PHOTO_Z module. Input files not found!'
+            print('WARNING: I will skip the PHOTO_Z module. Input files not found!')
             sys.stdout.flush()
             is_run_pz = False
             warning = True
     else:
-        print 'I will skip the PHOTO_Z module. Output file already there!'
+        print('I will skip the PHOTO_Z module. Output file already there!')
         sys.stdout.flush()
     if is_run_cat:
         nofile1 = not(os.path.exists(path['cat_full']))
         nofile2 = np.array([not(os.path.exists(path['m_'+f])) for f in fields]).any()
         if nofile1 or (not(is_run_mult) and nofile2):
-            print 'WARNING: I will skip the CATALOGUE module. Input file not found!'
+            print('WARNING: I will skip the CATALOGUE module. Input file not found!')
             sys.stdout.flush()
             is_run_cat = False
             warning = True
     else:
-        print 'I will skip the CATALOGUE module. Output files already there!'
+        print('I will skip the CATALOGUE module. Output files already there!')
         sys.stdout.flush()
     if is_run_map:
         nofile1 = np.array([not(os.path.exists(path['mask_'+f])) for f in fields]).any()
         nofile2 = np.array([not(os.path.exists(path['cat_'+f])) for f in fields]).any()
         if (not(is_run_mask) and nofile1) or (not(is_run_cat) and nofile2):
-            print 'WARNING: I will skip the MAP module. Input files not found!'
+            print('WARNING: I will skip the MAP module. Input files not found!')
             sys.stdout.flush()
             is_run_map = False
             warning = True
     else:
-        print 'I will skip the MAP module. Output files already there!'
+        print('I will skip the MAP module. Output files already there!')
         sys.stdout.flush()
     if is_run_cl:
         nofile1 = np.array([not(os.path.exists(path['mask_'+f])) for f in fields]).any()
         nofile2 = np.array([not(os.path.exists(path['cat_'+f])) for f in fields]).any()
         if (not(is_run_mask) and nofile1) or (not(is_run_cat) and nofile2):
-            print 'WARNING: I will skip the CL module. Input files not found!'
+            print('WARNING: I will skip the CL module. Input files not found!')
             sys.stdout.flush()
             is_run_cl = False
             warning = True
     else:
-        print 'I will skip the CL module. Output files already there!'
+        print('I will skip the CL module. Output files already there!')
         sys.stdout.flush()
     if is_run_sims:
         nofile1 = np.array([not(os.path.exists(path['mask_'+f])) for f in fields]).any()
         nofile2 = np.array([not(os.path.exists(path['cl_'+f])) for f in fields]).any()
         nofile3 = not(os.path.exists(path['cat_sims']))
         if (not(is_run_mask) and nofile1) or (not(is_run_cl) and nofile2) or nofile3:
-            print 'WARNING: I will skip the Cl sims module. Input files not found!'
+            print('WARNING: I will skip the Cl sims module. Input files not found!')
             sys.stdout.flush()
             is_run_sims = False
             warning = True
     else:
-        print 'I will skip the Cl sims module. Output files already there!'
+        print('I will skip the Cl sims module. Output files already there!')
         sys.stdout.flush()
 
 
@@ -194,7 +194,7 @@ def prep_fourier(args):
 
     def run_mask(path=path, fields=fields, z_bins=z_bins, size_pix=size_pix):
 
-        print 'Running MASK module'
+        print('Running MASK module')
         sys.stdout.flush()
         warning = False
 
@@ -204,7 +204,7 @@ def prep_fourier(args):
         try:
             cat = io.read_from_fits(fname, tabname)
         except KeyError:
-            print 'WARNING: No key '+tabname+' in '+fname+'. Skipping calculation!'
+            print('WARNING: No key '+tabname+' in '+fname+'. Skipping calculation!')
             sys.stdout.flush()
             return True
 
@@ -212,14 +212,14 @@ def prep_fourier(args):
         table_keys = ['ALPHA_J2000', 'DELTA_J2000', 'id']
         for key in table_keys:
             if key not in cat.columns.names:
-                print 'WARNING: No key '+key+' in table of '+fname+'. Skipping calculation!'
+                print('WARNING: No key '+key+' in table of '+fname+'. Skipping calculation!')
                 sys.stdout.flush()
                 return True
 
 
         # First loop: scan over the fields and generate new maps
         for f in fields:
-            print 'Calculating mask for field ' + f + ':'
+            print('Calculating mask for field ' + f + ':')
             sys.stdout.flush()
 
             # Remove old output file to avoid confusion
@@ -245,19 +245,19 @@ def prep_fourier(args):
             try:
                 mask_sec = io.read_from_fits(fname, imname).astype(np.uint16)
             except KeyError:
-                print 'WARNING: No key '+imname+' in '+fname+'. Skipping calculation!'
+                print('WARNING: No key '+imname+' in '+fname+'. Skipping calculation!')
                 sys.stdout.flush()
                 return True
             # Read mask header and check necessary keys
             try:
                 hd_sec = io.read_header_from_fits(fname, imname)
             except KeyError:
-                print 'WARNING: No header in '+fname+'. Skipping calculation!'
+                print('WARNING: No header in '+fname+'. Skipping calculation!')
                 sys.stdout.flush()
                 return True
             for key in ['CRPIX1','CRPIX2','CD1_1','CD2_2','CRVAL1','CRVAL2','CTYPE1','CTYPE2']:
                 if key not in list(hd_sec.keys()):
-                    print 'WARNING: No key '+key+' in '+fname+'. Skipping calculation!'
+                    print('WARNING: No key '+key+' in '+fname+'. Skipping calculation!')
                     sys.stdout.flush()
                     return True
 
@@ -270,7 +270,7 @@ def prep_fourier(args):
             cond1 = abs(dim_ratio/abs(size_pix/(hd_sec['CD1_1']*60.**2))-1)>1e-6
             cond2 = abs(dim_ratio/abs(size_pix/(hd_sec['CD2_2']*60.**2))-1)>1e-6
             if cond1 or cond2:
-                print 'WARNING: Invalid pixel dimensions. Skipping calculation!'
+                print('WARNING: Invalid pixel dimensions. Skipping calculation!')
                 sys.stdout.flush()
                 return True
 
@@ -312,7 +312,7 @@ def prep_fourier(args):
             hd = w.to_header()
 
             # Print message
-            print '----> Degraded mask for '+f+'. Now I will remove the bad fields!'
+            print('----> Degraded mask for '+f+'. Now I will remove the bad fields!')
             sys.stdout.flush()
 
 
@@ -353,7 +353,7 @@ def prep_fourier(args):
                     pos_bad = np.unique(pos_bad, axis=0)
                     mask[pos_bad[:,0], pos_bad[:,1]] = 0
                 # Print message
-                print '----> Removed bad field '+os.path.split(url)[1]+' from '+f+' mask!'
+                print('----> Removed bad field '+os.path.split(url)[1]+' from '+f+' mask!')
                 sys.stdout.flush()
                 # Remove file to save space
                 if args.remove_files:
@@ -369,7 +369,7 @@ def prep_fourier(args):
             # Pixels where at least one galaxy has been found
             pos = np.unique(pos, axis=0)
             mask[pos[:,0], pos[:,1]] = 0
-            print '----> Removed galaxies in bad fields for '+f+'!'
+            print('----> Removed galaxies in bad fields for '+f+'!')
             sys.stdout.flush()
 
 
@@ -417,7 +417,7 @@ def prep_fourier(args):
                 name = 'MASK_{}_Z{}'.format(f, n_z_bin+1)
                 warning = io.write_to_fits(path['mask_'+f], weights_mask, name, header=hd, type='image') or warning
 
-                print '----> Created mask for field {} and bin {}'.format(f,n_z_bin+1)
+                print('----> Created mask for field {} and bin {}'.format(f,n_z_bin+1))
                 sys.stdout.flush()
 
                 # Generate plots
@@ -437,7 +437,7 @@ def prep_fourier(args):
 
     def run_mult(path=path, fields=fields, z_bins=z_bins, n_avg_m=n_avg_m):
 
-        print 'Running MULT_CORR module'
+        print('Running MULT_CORR module')
         sys.stdout.flush()
         warning = False
 
@@ -448,7 +448,7 @@ def prep_fourier(args):
         try:
             cat = io.read_from_fits(fname, tabname)
         except KeyError:
-            print 'WARNING: No key '+tabname+' in '+fname+'. Skipping calculation!'
+            print('WARNING: No key '+tabname+' in '+fname+'. Skipping calculation!')
             sys.stdout.flush()
             return True
 
@@ -456,7 +456,7 @@ def prep_fourier(args):
         table_keys = ['ALPHA_J2000', 'DELTA_J2000', 'm', 'weight', 'id', 'Z_B', 'MASK', 'star_flag']
         for key in table_keys:
             if key not in cat.columns.names:
-                print 'WARNING: No key '+key+' in table of '+fname+'. Skipping calculation!'
+                print('WARNING: No key '+key+' in table of '+fname+'. Skipping calculation!')
                 sys.stdout.flush()
                 return True
 
@@ -473,7 +473,7 @@ def prep_fourier(args):
             # Second loop: divide galaxies in redshift bins
             for n_z_bin, z_bin in enumerate(z_bins):
 
-                print 'Calculating multiplicative correction for field ' + f + ' and bin {}:'.format(n_z_bin+1)
+                print('Calculating multiplicative correction for field ' + f + ' and bin {}:'.format(n_z_bin+1))
                 sys.stdout.flush()
 
 
@@ -484,7 +484,7 @@ def prep_fourier(args):
                     mask = io.read_from_fits(fname, imname)
                     hd = io.read_header_from_fits(fname, imname)
                 except KeyError:
-                    print 'WARNING: No key '+imname+' in '+fname+'. Skipping calculation!'
+                    print('WARNING: No key '+imname+' in '+fname+'. Skipping calculation!')
                     sys.stdout.flush()
                     return True
                 # Create a new WCS object
@@ -530,7 +530,7 @@ def prep_fourier(args):
 
                     # Print message every some step
                     if (count+1) % 1e3 == 0:
-                        print '----> Done {0:5.1%} of the pixels ({1:d})'.format(float(count+1)/len(pos_unique), len(pos_unique))
+                        print('----> Done {0:5.1%} of the pixels ({1:d})'.format(float(count+1)/len(pos_unique), len(pos_unique)))
                         sys.stdout.flush()
 
                 # Save to file the map
@@ -555,7 +555,7 @@ def prep_fourier(args):
 
     def run_pz(path=path, z_bins=z_bins, fields=fields):
 
-        print 'Running PHOTO_Z module'
+        print('Running PHOTO_Z module')
         sys.stdout.flush()
         warning = False
 
@@ -577,7 +577,7 @@ def prep_fourier(args):
                 mask[f] = io.read_from_fits(fname, imname)
                 hd = io.read_header_from_fits(fname, imname)
             except KeyError:
-                print 'WARNING: No key '+imname+' in '+fname+'. Skipping calculation!'
+                print('WARNING: No key '+imname+' in '+fname+'. Skipping calculation!')
                 sys.stdout.flush()
                 return True
             # Create a new WCS object
@@ -590,13 +590,13 @@ def prep_fourier(args):
         try:
             cat = io.read_from_fits(fname, tabname)
         except KeyError:
-            print 'WARNING: No key '+tabname+' in '+fname+'. Skipping calculation!'
+            print('WARNING: No key '+tabname+' in '+fname+'. Skipping calculation!')
             sys.stdout.flush()
             return True
         try:
             pz_full = io.read_from_fits(fname, imname)
         except KeyError:
-            print 'WARNING: No key '+imname+' in '+fname+'. Skipping calculation!'
+            print('WARNING: No key '+imname+' in '+fname+'. Skipping calculation!')
             sys.stdout.flush()
             return True
 
@@ -604,7 +604,7 @@ def prep_fourier(args):
         table_keys = ['ALPHA_J2000', 'DELTA_J2000', 'm', 'weight', 'id', 'Z_B', 'MASK', 'star_flag']
         for key in table_keys:
             if key not in cat.columns.names:
-                print 'WARNING: No key '+key+' in table of '+fname+'. Skipping calculation!'
+                print('WARNING: No key '+key+' in table of '+fname+'. Skipping calculation!')
                 sys.stdout.flush()
                 return True
 
@@ -618,7 +618,7 @@ def prep_fourier(args):
                 try:
                     m[f][n_z_bin] = io.read_from_fits(fname, imname)
                 except KeyError:
-                    print 'WARNING: No key '+imname+' in '+fname+'. Skipping calculation!'
+                    print('WARNING: No key '+imname+' in '+fname+'. Skipping calculation!')
                     sys.stdout.flush()
                     return True
 
@@ -635,7 +635,7 @@ def prep_fourier(args):
                 filt[filt][masked] = False
                 filter[f][n_z_bin] = filt
         # Print progress message
-        print '----> Created filters!'
+        print('----> Created filters!')
         sys.stdout.flush()
 
         # Correct ellipticities
@@ -649,7 +649,7 @@ def prep_fourier(args):
         cat['e1'] = cat['e1']/(1+m_corr)
         cat['e2'] = (cat['e2']-cat['c2'])/(1+m_corr)
         # Print progress message
-        print '----> Corrected ellipticities!'
+        print('----> Corrected ellipticities!')
         sys.stdout.flush()
 
 
@@ -718,7 +718,7 @@ def prep_fourier(args):
 
 
             # Print progress message
-            print '----> Completed bin {}'.format(n_z_bin+1)
+            print('----> Completed bin {}'.format(n_z_bin+1))
             sys.stdout.flush()
 
         # Save to file the results
@@ -767,7 +767,7 @@ def prep_fourier(args):
 
     def run_cat(path=path, fields=fields, z_bins=z_bins):
 
-        print 'Running CATALOGUE module'
+        print('Running CATALOGUE module')
         sys.stdout.flush()
         warning = False
 
@@ -778,7 +778,7 @@ def prep_fourier(args):
         try:
             cat = io.read_from_fits(fname, tabname)
         except KeyError:
-            print 'WARNING: No key '+tabname+' in '+fname+'. Skipping calculation!'
+            print('WARNING: No key '+tabname+' in '+fname+'. Skipping calculation!')
             sys.stdout.flush()
             return True
 
@@ -786,7 +786,7 @@ def prep_fourier(args):
         table_keys = ['ALPHA_J2000', 'DELTA_J2000', 'e1', 'e2', 'c2', 'weight', 'id', 'Z_B', 'MASK', 'star_flag']
         for key in table_keys:
             if key not in cat.columns.names:
-                print 'WARNING: No key '+key+' in table of '+fname+'. Skipping calculation!'
+                print('WARNING: No key '+key+' in table of '+fname+'. Skipping calculation!')
                 sys.stdout.flush()
                 return True
 
@@ -803,7 +803,7 @@ def prep_fourier(args):
             # Second loop: divide galaxies in redshift bins
             for n_z_bin, z_bin in enumerate(z_bins):
 
-                print 'Calculating catalogue for field ' + f + ' and bin {}:'.format(n_z_bin+1)
+                print('Calculating catalogue for field ' + f + ' and bin {}:'.format(n_z_bin+1))
                 sys.stdout.flush()
 
 
@@ -814,7 +814,7 @@ def prep_fourier(args):
                     m = io.read_from_fits(fname, imname)
                     hd = io.read_header_from_fits(fname, imname)
                 except KeyError:
-                    print 'WARNING: No key '+imname+' in '+fname+'. Skipping calculation!'
+                    print('WARNING: No key '+imname+' in '+fname+'. Skipping calculation!')
                     sys.stdout.flush()
                     return True
                 # Create a new WCS object
@@ -853,7 +853,7 @@ def prep_fourier(args):
 
     def run_map(path=path, fields=fields, z_bins=z_bins):
 
-        print 'Running MAP module'
+        print('Running MAP module')
         sys.stdout.flush()
         warning = False
 
@@ -870,7 +870,7 @@ def prep_fourier(args):
             # Second loop: divide galaxies in redshift bins
             for n_z_bin, z_bin in enumerate(z_bins):
 
-                print 'Calculating map for field ' + f + ' and bin {}:'.format(n_z_bin+1)
+                print('Calculating map for field ' + f + ' and bin {}:'.format(n_z_bin+1))
                 sys.stdout.flush()
 
 
@@ -881,7 +881,7 @@ def prep_fourier(args):
                     mask = io.read_from_fits(fname, imname)
                     hd = io.read_header_from_fits(fname, imname)
                 except KeyError:
-                    print 'WARNING: No key '+imname+' in '+fname+'. Skipping calculation!'
+                    print('WARNING: No key '+imname+' in '+fname+'. Skipping calculation!')
                     sys.stdout.flush()
                     return True
                 # Create a new WCS object
@@ -893,7 +893,7 @@ def prep_fourier(args):
                 try:
                     cat = io.read_from_fits(fname, tabname)
                 except KeyError:
-                    print 'WARNING: No key '+tabname+' in '+fname+'. Skipping calculation!'
+                    print('WARNING: No key '+tabname+' in '+fname+'. Skipping calculation!')
                     sys.stdout.flush()
                     return True
 
@@ -901,7 +901,7 @@ def prep_fourier(args):
                 table_keys = ['ALPHA_J2000', 'DELTA_J2000', 'e1', 'e2', 'weight']
                 for key in table_keys:
                     if key not in cat.columns.names:
-                        print 'WARNING: No key '+key+' in table of '+fname+'. Skipping calculation!'
+                        print('WARNING: No key '+key+' in table of '+fname+'. Skipping calculation!')
                         sys.stdout.flush()
                         return True
 
@@ -936,7 +936,7 @@ def prep_fourier(args):
 
     def run_cl(path=path, fields=fields, z_bins=z_bins, bp=bandpowers, n_sims=n_sims_noise):
 
-        print 'Running CL module'
+        print('Running CL module')
         sys.stdout.flush()
         warning = False
 
@@ -944,7 +944,7 @@ def prep_fourier(args):
         # First loop: scan over the fields
         for f in fields:
 
-            print 'Calculating cl for field {}:'.format(f)
+            print('Calculating cl for field {}:'.format(f))
             sys.stdout.flush()
 
             # Remove old output file to avoid confusion
@@ -959,7 +959,7 @@ def prep_fourier(args):
             try:
                 hd = io.read_header_from_fits(fname, t) # Header is the same for each bin
             except KeyError:
-                print 'WARNING: No key {} in {}. Skipping calculation!'.format(t,fname)
+                print('WARNING: No key {} in {}. Skipping calculation!'.format(t,fname))
                 sys.stdout.flush()
                 return True
             w = wcs.WCS(hd)
@@ -969,7 +969,7 @@ def prep_fourier(args):
                 try:
                     mask[n_z_bin] = io.read_from_fits(fname, t)
                 except KeyError:
-                    print 'WARNING: No key {} in {}. Skipping calculation!'.format(t,fname)
+                    print('WARNING: No key {} in {}. Skipping calculation!'.format(t,fname))
                     sys.stdout.flush()
                     return True
 
@@ -981,7 +981,7 @@ def prep_fourier(args):
                 try:
                     cat[n_z_bin] = io.read_from_fits(fname, t)
                 except KeyError:
-                    print 'WARNING: No key {} in {}. Skipping calculation!'.format(t,fname)
+                    print('WARNING: No key {} in {}. Skipping calculation!'.format(t,fname))
                     sys.stdout.flush()
                     return True
 
@@ -989,7 +989,7 @@ def prep_fourier(args):
                 table_keys = ['ALPHA_J2000', 'DELTA_J2000', 'e1', 'e2', 'weight']
                 for key in table_keys:
                     if key not in cat[n_z_bin].columns.names:
-                        print 'WARNING: No key '+key+' in table of '+fname+'. Skipping calculation!'
+                        print('WARNING: No key '+key+' in table of '+fname+'. Skipping calculation!')
                         sys.stdout.flush()
                         return True
 
@@ -1027,7 +1027,7 @@ def prep_fourier(args):
                     map[n_z_bin], _ = tools.get_map(w, mask[n_z_bin], cat_sim, pos_in=pos[n_z_bin])
                 # Print message every some step
                 if (ns+1) % 1e2 == 0:
-                    print '----> Done {0:5.1%} of the noise Cls ({1:d})'.format(float(ns+1)/n_sims,n_sims)
+                    print('----> Done {0:5.1%} of the noise Cls ({1:d})'.format(float(ns+1)/n_sims,n_sims))
                     sys.stdout.flush()
                 # Get Cl's
                 map = np.transpose(map,axes=(1,0,2,3))
@@ -1073,7 +1073,7 @@ def prep_fourier(args):
 
     def run_sims(path=path, fields=fields, z_bins=z_bins, bp=bandpowers):
 
-        print 'Running Cl sims module'
+        print('Running Cl sims module')
         sys.stdout.flush()
         warning = False
 
@@ -1081,7 +1081,7 @@ def prep_fourier(args):
         # First loop: scan over the fields
         for nf, f in enumerate(fields):
 
-            print 'Calculating Cls from simulations for field {}:'.format(f)
+            print('Calculating Cls from simulations for field {}:'.format(f))
             sys.stdout.flush()
 
             # Remove old output file to avoid confusion
@@ -1106,7 +1106,7 @@ def prep_fourier(args):
             try:
                 hd = io.read_header_from_fits(fname, t) # Header is the same for each bin
             except KeyError:
-                print 'WARNING: No key {} in {}. Skipping calculation!'.format(t,fname)
+                print('WARNING: No key {} in {}. Skipping calculation!'.format(t,fname))
                 sys.stdout.flush()
                 return True
             w = wcs.WCS(hd)
@@ -1116,7 +1116,7 @@ def prep_fourier(args):
                 try:
                     mask[n_z_bin] = io.read_from_fits(fname, t)
                 except KeyError:
-                    print 'WARNING: No key {} in {}. Skipping calculation!'.format(t,fname)
+                    print('WARNING: No key {} in {}. Skipping calculation!'.format(t,fname))
                     sys.stdout.flush()
                     return True
 
@@ -1130,7 +1130,7 @@ def prep_fourier(args):
                     try:
                         cat[n_z_bin] = io.read_from_fits(fname, t)
                     except KeyError:
-                        print 'WARNING: No key {} in {}. Skipping calculation!'.format(t,fname)
+                        print('WARNING: No key {} in {}. Skipping calculation!'.format(t,fname))
                         sys.stdout.flush()
                         return True
 
@@ -1138,7 +1138,7 @@ def prep_fourier(args):
                     table_keys = ['ALPHA_J2000', 'DELTA_J2000', 'e1', 'e2', 'weight']
                     for key in table_keys:
                         if key not in cat[n_z_bin].columns.names:
-                            print 'WARNING: No key '+key+' in table of '+fname+'. Skipping calculation!'
+                            print('WARNING: No key '+key+' in table of '+fname+'. Skipping calculation!')
                             sys.stdout.flush()
                             return True
 
@@ -1154,7 +1154,7 @@ def prep_fourier(args):
 
                 # Print message every some step
                 if (ns+1) % 1e2 == 0:
-                    print '----> Done {0:5.1%} of the simulations ({1:d})'.format(float(ns+1)/len(list_sims), len(list_sims))
+                    print('----> Done {0:5.1%} of the simulations ({1:d})'.format(float(ns+1)/len(list_sims), len(list_sims)))
                     sys.stdout.flush()
 
             # Save to file the map
@@ -1173,7 +1173,7 @@ def prep_fourier(args):
 
     def run_final(path=path, fields=fields, z_bins=z_bins, bp=bandpowers):
 
-        print 'Running Final module'
+        print('Running Final module')
         sys.stdout.flush()
         warning = False
 
@@ -1193,21 +1193,21 @@ def prep_fourier(args):
             try:
                 ell = io.read_from_fits(fname, imname)
             except KeyError:
-                print 'WARNING: No key {} in {}. Skipping calculation!'.format(imname,fname)
+                print('WARNING: No key {} in {}. Skipping calculation!'.format(imname,fname))
                 sys.stdout.flush()
                 return True
             imname = 'CL_{}'.format(f)
             try:
                 cl.append(io.read_from_fits(fname, imname))
             except KeyError:
-                print 'WARNING: No key {} in {}. Skipping calculation!'.format(imname,fname)
+                print('WARNING: No key {} in {}. Skipping calculation!'.format(imname,fname))
                 sys.stdout.flush()
                 return True
             imname = 'CL_NOISE_{}'.format(f)
             try:
                 cl_n.append(io.read_from_fits(fname, imname))
             except KeyError:
-                print 'WARNING: No key {} in {}. Skipping calculation!'.format(imname,fname)
+                print('WARNING: No key {} in {}. Skipping calculation!'.format(imname,fname))
                 sys.stdout.flush()
                 return True
         # Write ells
@@ -1232,7 +1232,7 @@ def prep_fourier(args):
             try:
                 cl.append(io.read_from_fits(fname, imname))
             except KeyError:
-                print 'WARNING: No key {} in {}. Skipping calculation!'.format(imname,fname)
+                print('WARNING: No key {} in {}. Skipping calculation!'.format(imname,fname))
                 sys.stdout.flush()
                 return True
         # Write cl sims
@@ -1248,7 +1248,7 @@ def prep_fourier(args):
         try:
             image = io.read_from_fits(fname, imname)
         except KeyError:
-            print 'WARNING: No key {} in {}. Skipping calculation!'.format(imname,fname)
+            print('WARNING: No key {} in {}. Skipping calculation!'.format(imname,fname))
             sys.stdout.flush()
             return True
         warning = io.write_to_fits(path['final'], image, imname, type='image') or warning
@@ -1259,7 +1259,7 @@ def prep_fourier(args):
         try:
             image = io.read_from_fits(fname, imname)
         except KeyError:
-            print 'WARNING: No key {} in {}. Skipping calculation!'.format(imname,fname)
+            print('WARNING: No key {} in {}. Skipping calculation!'.format(imname,fname))
             sys.stdout.flush()
             return True
         warning = io.write_to_fits(path['final'], image, imname, type='image') or warning
@@ -1270,7 +1270,7 @@ def prep_fourier(args):
         try:
             image = io.read_from_fits(fname, imname)
         except KeyError:
-            print 'WARNING: No key {} in {}. Skipping calculation!'.format(imname,fname)
+            print('WARNING: No key {} in {}. Skipping calculation!'.format(imname,fname))
             sys.stdout.flush()
             return True
         warning = io.write_to_fits(path['final'], image, imname, type='image') or warning
@@ -1290,7 +1290,7 @@ def prep_fourier(args):
         end = time.time()
         hrs, rem = divmod(end-start, 3600)
         mins, secs = divmod(rem, 60)
-        print 'Run MASK module in {:0>2} Hours {:0>2} Minutes {:05.2f} Seconds!'.format(int(hrs),int(mins),secs)
+        print('Run MASK module in {:0>2} Hours {:0>2} Minutes {:05.2f} Seconds!'.format(int(hrs),int(mins),secs))
         sys.stdout.flush()
     if is_run_mult:
         start = time.time()
@@ -1298,7 +1298,7 @@ def prep_fourier(args):
         end = time.time()
         hrs, rem = divmod(end-start, 3600)
         mins, secs = divmod(rem, 60)
-        print 'Run MULT_CORR module in {:0>2} Hours {:0>2} Minutes {:05.2f} Seconds!'.format(int(hrs),int(mins),secs)
+        print('Run MULT_CORR module in {:0>2} Hours {:0>2} Minutes {:05.2f} Seconds!'.format(int(hrs),int(mins),secs))
         sys.stdout.flush()
     if is_run_pz:
         start = time.time()
@@ -1306,7 +1306,7 @@ def prep_fourier(args):
         end = time.time()
         hrs, rem = divmod(end-start, 3600)
         mins, secs = divmod(rem, 60)
-        print 'Run PHOTO_Z module in {:0>2} Hours {:0>2} Minutes {:05.2f} Seconds!'.format(int(hrs),int(mins),secs)
+        print('Run PHOTO_Z module in {:0>2} Hours {:0>2} Minutes {:05.2f} Seconds!'.format(int(hrs),int(mins),secs))
         sys.stdout.flush()
     if is_run_cat:
         start = time.time()
@@ -1314,7 +1314,7 @@ def prep_fourier(args):
         end = time.time()
         hrs, rem = divmod(end-start, 3600)
         mins, secs = divmod(rem, 60)
-        print 'Run CATALOGUE module in {:0>2} Hours {:0>2} Minutes {:05.2f} Seconds!'.format(int(hrs),int(mins),secs)
+        print('Run CATALOGUE module in {:0>2} Hours {:0>2} Minutes {:05.2f} Seconds!'.format(int(hrs),int(mins),secs))
         sys.stdout.flush()
     if is_run_map:
         start = time.time()
@@ -1322,7 +1322,7 @@ def prep_fourier(args):
         end = time.time()
         hrs, rem = divmod(end-start, 3600)
         mins, secs = divmod(rem, 60)
-        print 'Run MAP module in {:0>2} Hours {:0>2} Minutes {:05.2f} Seconds!'.format(int(hrs),int(mins),secs)
+        print('Run MAP module in {:0>2} Hours {:0>2} Minutes {:05.2f} Seconds!'.format(int(hrs),int(mins),secs))
         sys.stdout.flush()
     if is_run_cl:
         start = time.time()
@@ -1330,7 +1330,7 @@ def prep_fourier(args):
         end = time.time()
         hrs, rem = divmod(end-start, 3600)
         mins, secs = divmod(rem, 60)
-        print 'Run CL module in {:0>2} Hours {:0>2} Minutes {:05.2f} Seconds!'.format(int(hrs),int(mins),secs)
+        print('Run CL module in {:0>2} Hours {:0>2} Minutes {:05.2f} Seconds!'.format(int(hrs),int(mins),secs))
         sys.stdout.flush()
     if is_run_sims:
         start = time.time()
@@ -1338,7 +1338,7 @@ def prep_fourier(args):
         end = time.time()
         hrs, rem = divmod(end-start, 3600)
         mins, secs = divmod(rem, 60)
-        print 'Run Cl sims module in {:0>2} Hours {:0>2} Minutes {:05.2f} Seconds!'.format(int(hrs),int(mins),secs)
+        print('Run Cl sims module in {:0>2} Hours {:0>2} Minutes {:05.2f} Seconds!'.format(int(hrs),int(mins),secs))
         sys.stdout.flush()
     # Collect everything in a single file
     start = time.time()
@@ -1346,14 +1346,14 @@ def prep_fourier(args):
     end = time.time()
     hrs, rem = divmod(end-start, 3600)
     mins, secs = divmod(rem, 60)
-    print 'Run Final module in {:0>2} Hours {:0>2} Minutes {:05.2f} Seconds!'.format(int(hrs),int(mins),secs)
+    print('Run Final module in {:0>2} Hours {:0>2} Minutes {:05.2f} Seconds!'.format(int(hrs),int(mins),secs))
     sys.stdout.flush()
 
     if warning:
-        print 'Done! However something went unexpectedly!! Check your warnings!'
+        print('Done! However something went unexpectedly!! Check your warnings!')
         sys.stdout.flush()
     else:
-        print 'Success!!'
+        print('Success!!')
         sys.stdout.flush()
 
     return

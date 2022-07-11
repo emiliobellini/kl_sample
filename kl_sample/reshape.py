@@ -15,7 +15,7 @@ Functions:
 """
 
 import numpy as np
-import settings as set
+import kl_sample.settings as set
 import pymaster as nmt
 
 

@@ -5,10 +5,10 @@ This module calculates the KL transform given a fiducial cosmology.
 """
 
 import numpy as np
-import io
-import likelihood as lkl
-import reshape as rsh
-import settings as set
+import kl_sample.io as io
+import kl_sample.likelihood as lkl
+import kl_sample.reshape as rsh
+import kl_sample.settings as set
 
 
 def get_kl(args):
@@ -72,4 +72,4 @@ def get_kl(args):
 
     io.print_info_fits(path['data'])
 
-    print 'Success!!'
+    print('Success!!')

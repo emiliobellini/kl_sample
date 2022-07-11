@@ -66,7 +66,7 @@ def get_map(w, mask, cat, pos_in=None):
     map_2[pos_unique[:,0],pos_unique[:,1]] = g2_at_pos
 
     # empty = 1.-np.array([mask[tuple(x)] for x in pos_unique]).sum()/mask.flatten().sum()
-    # print '----> Empty pixels: {0:5.2%}'.format(empty)
+    # print('----> Empty pixels: {0:5.2%}'.format(empty))
     # sys.stdout.flush()
 
     return np.array([map_1, map_2]), pos
@@ -124,7 +124,7 @@ def get_cl(field, bp, hd, mask, map, tmp_path=None):
             except:
                 wf.compute_coupling_matrix(fd[nb1],fd[nb2],b)
                 wf.write_to(mcm_p)
-                print 'Calculated mode coupling matrix for bins {}{}'.format(nb1+1,nb2+1)
+                print('Calculated mode coupling matrix for bins {}{}'.format(nb1+1,nb2+1))
                 sys.stdout.flush()
             # Calculate Cl's
             cl_c = nmt.compute_coupled_cell_flat(fd[nb1],fd[nb2],b)

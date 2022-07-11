@@ -8,9 +8,9 @@ the data will be stored in the repository.
 
 import os
 import numpy as np
-import settings as set
-import io
-import reshape as rsh
+import kl_sample.settings as set
+import kl_sample.io as io
+import kl_sample.reshape as rsh
 
 def prep_real(args):
     """ Prepare data in real space.

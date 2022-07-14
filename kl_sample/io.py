@@ -356,7 +356,7 @@ def unpack_simulated_xipm(fname):
     """
 
     # Import local variables from settings
-    n_bins = len(set.Z_BINS)-1
+    n_bins = len(set.Z_BINS)
     n_theta = len(set.THETA_ARCMIN)
     n_fields = len(set.A_CFHTlens)
 
@@ -415,7 +415,7 @@ def read_photo_z_data(fname):
     hdul.close()
 
     # Local variables
-    z_bins = np.array([[set.Z_BINS[n], set.Z_BINS[n+1]] for n in np.arange(len(set.Z_BINS)-1)])
+    z_bins = set.Z_BINS
     sel_bins = np.array([set.filter_galaxies(table, z_bins[n][0], z_bins[n][1]) for n in range(len(z_bins))])
     photo_z = np.zeros((len(z_bins)+1,len(image[0])))
     n_eff = np.zeros(len(z_bins))

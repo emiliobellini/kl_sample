@@ -230,7 +230,7 @@ def unflatten_xipm(array):
     """
 
     # Local variables
-    n_bins = len(set.Z_BINS)-1
+    n_bins = len(set.Z_BINS)
     n_theta = len(set.THETA_ARCMIN)
 
     # Initialize array with xipm

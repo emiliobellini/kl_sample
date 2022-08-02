@@ -1243,8 +1243,13 @@ def run_cat_sims(path, fields, z_bins, n_sims_cov):
         print(path['cat_sims'])
         for i in range(n_sims_cov):
             fname = join(path['cat_sims'], 'sim_{}_cat_{}.fits'.format(i, f))
-            print('----> Running simulation {} for field {}'.format(i, f))
             get_gaussian_sim(w, masks, cl_matrix, cats, ipixs, i, fname, f)
+            # Print message every some step
+            if (i+1) % 1e2 == 0:
+                print('----> Calculated {0:5.1%} of the simulation catalogues '
+                      '({1:d}) for field {2}'.format(float(i+1)/n_sims_cov,
+                                                     n_sims_cov, f))
+                sys.stdout.flush()
 
     return warning
 

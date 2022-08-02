@@ -26,8 +26,7 @@ from astropy.io import fits
 import kl_sample.settings as set
 
 
-
-# ------------------- Parser --------------------------------------------------#
+# ------------------- Parser -------------------------------------------------#
 
 def argument_parser():
     """ Call the parser to read command line arguments.
@@ -41,11 +40,11 @@ def argument_parser():
     """
 
     parser = argparse.ArgumentParser(
-    'Sample the cosmological parameter space using lensing data.'
-    )
+        'Sample the cosmological parameter space using lensing data.')
 
-    #Add supbarser to select between run and prep modes.
-    subparsers = parser.add_subparsers(dest='mode',
+    # Add supbarser to select between run and prep modes.
+    subparsers = parser.add_subparsers(
+        dest='mode',
         help='Options are: '
         '(i) prep_real: prepare data in real space. '
         '(ii) prep_fourier: prepare data in fourier space. '
@@ -60,46 +59,76 @@ def argument_parser():
     plots_parser = subparsers.add_parser('plots')
     get_kl_parser = subparsers.add_parser('get_kl')
 
-    #Arguments for 'run'
+    # Arguments for 'run'
     run_parser.add_argument('params_file', type=str, help='Parameters file')
-    run_parser.add_argument('--restart', '-r', help='Restart the chains'
-        'from the last point of the output file (only for emcee)',
+    run_parser.add_argument(
+        '--restart', '-r', help='Restart the chains from the last point '
+        'of the output file (only for emcee)', action='store_true')
+
+    # Arguments for 'prep_real'
+    prep_real_parser.add_argument(
+        'input_folder', type=str, help='Input folder.')
+
+    # Arguments for 'prep_fourier'
+    prep_fourier_parser.add_argument(
+        'input_path', type=str, help='Input folder. Files that should contain:'
+        ' cat_full.fits, mask_arcsec_N.fits.gz (N=1,..,4), mask_url.txt. '
+        'See description in kl_sample/prep_fourier.py for more details.')
+    prep_fourier_parser.add_argument(
+        '--output_path', '-o', type=str, help='Output folder.')
+    prep_fourier_parser.add_argument(
+        '--badfields_path', '-bp', type=str, help='Folder where the bad fields'
+        ' mask are stored, or where they well be downloaded.')
+    prep_fourier_parser.add_argument(
+        '--cat_sims_path', '-cp', type=str, help='Folder where the catalogues'
+        ' of the simulations are stored, or where they well be downloaded.')
+    prep_fourier_parser.add_argument(
+        '--run_all', '-a', help='Run all routines even if the files are '
+        'already present', action='store_true')
+    prep_fourier_parser.add_argument(
+        '--run_mask', '-mk', help='Run mask routine even if the files are '
+        'already present', action='store_true')
+    prep_fourier_parser.add_argument(
+        '--run_mult', '-m', help='Run multiplicative correction routine even '
+        'if the files are already present', action='store_true')
+    prep_fourier_parser.add_argument(
+        '--run_pz', '-pz', help='Run photo_z routine even if the files are '
+        'already present', action='store_true')
+    prep_fourier_parser.add_argument(
+        '--run_cat', '-c', help='Run catalogue routine even if the files are '
+        'already present', action='store_true')
+    prep_fourier_parser.add_argument(
+        '--run_map', '-mp', help='Run map routine even if the files are '
+        'already present', action='store_true')
+    prep_fourier_parser.add_argument(
+        '--run_cl', '-cl', help='Run Cl routine even if the files are '
+        'already present', action='store_true')
+    prep_fourier_parser.add_argument(
+        '--run_cat_sims', '-cats', help='Run Cat sims routine even if the '
+        'files are already present', action='store_true')
+    prep_fourier_parser.add_argument(
+        '--run_cl_sims', '-cls', help='Run Cl sims routine even if the '
+        'files are already present', action='store_true')
+    prep_fourier_parser.add_argument(
+        '--want_plots', '-p', help='Generate plots for the images',
         action='store_true')
-    #Arguments for 'prep_real'
-    prep_real_parser.add_argument('input_folder', type=str, help='Input folder')
-    #Arguments for 'prep_fourier'
-    prep_fourier_parser.add_argument('input_path', type=str, help='Path to input files')
-    prep_fourier_parser.add_argument('--output_path', '-o', type=str, help='Path to output files')
-    prep_fourier_parser.add_argument('--run_all', '-a', help='Run all routines '
-        'even if the files are already present', action='store_true')
-    prep_fourier_parser.add_argument('--run_mask', '-mk', help='Run mask routine '
-        'even if the files are already present', action='store_true')
-    prep_fourier_parser.add_argument('--run_mult', '-m', help='Run multiplicative correction '
-        'routine even if the files are already present', action='store_true')
-    prep_fourier_parser.add_argument('--run_pz', '-pz', help='Run photo_z routine '
-        'even if the files are already present', action='store_true')
-    prep_fourier_parser.add_argument('--run_cat', '-c', help='Run catalogue routine '
-        'even if the files are already present', action='store_true')
-    prep_fourier_parser.add_argument('--run_map', '-mp', help='Run map routine '
-        'even if the files are already present', action='store_true')
-    prep_fourier_parser.add_argument('--run_cl', '-cl', help='Run Cl routine '
-        'even if the files are already present', action='store_true')
-    prep_fourier_parser.add_argument('--run_sims', '-s', help='Run Cl sims routine '
-        'even if the files are already present', action='store_true')
-    prep_fourier_parser.add_argument('--want_plots', '-p', help='Generate plots for the images',
+    prep_fourier_parser.add_argument(
+        '--remove_files', '-rp', help='Remove downloaded files',
         action='store_true')
-    prep_fourier_parser.add_argument('--remove_files', '-rp', help='Remove downloaded files',
-        action='store_true')
-    #Arguments for 'plots'
-    plots_parser.add_argument('output_path', type=str, help='Path to output files')
-    plots_parser.add_argument('--params_file', '-p', type=str, help='Path to parameter file')
-    #Arguments for 'get_kl'
+
+    # Arguments for 'plots'
+    plots_parser.add_argument(
+        'output_path', type=str, help='Path to output files')
+    plots_parser.add_argument(
+        '--params_file', '-p', type=str, help='Path to parameter file')
+
+    # Arguments for 'get_kl'
     get_kl_parser.add_argument('params_file', type=str, help='Parameters file')
 
     return parser.parse_args()
 
 
-# ------------------- Check existence -----------------------------------------#
+# ------------------- Check existence ----------------------------------------#
 
 def path_exists_or_error(path):
     """ Check if a path exists, otherwise it returns error.
@@ -111,13 +140,10 @@ def path_exists_or_error(path):
         abspath: if the file exists it returns its absolute path
 
     """
-
     abspath = os.path.abspath(path)
-
     if os.path.exists(abspath):
         return abspath
-
-    raise IOError('Path ' + abspath + ' not found!')
+    raise IOError('Path {} not found!'.format(abspath))
 
 
 def path_exists_or_create(path):
@@ -131,21 +157,18 @@ def path_exists_or_create(path):
         abspath: return the absolute path of path.
 
     """
-
     abspath = os.path.abspath(path)
     folder, name = os.path.split(abspath)
-    cond1 = not bool(re.match('.+_', name, re.IGNORECASE))
-    cond2 = not bool(re.match('.+\..{3}', name, re.IGNORECASE))
+    cond1 = not bool(re.fullmatch('.+_', name, re.IGNORECASE))
+    cond2 = not bool(re.fullmatch(r'.+\..{3}', name, re.IGNORECASE))
     if cond1 and cond2:
-        folder += '/{}'.format(name)
-
+        folder = abspath
     if not os.path.exists(folder):
         os.makedirs(folder)
-
     return folder
 
 
-# ------------------- Read ini ------------------------------------------------#
+# ------------------- Read ini -----------------------------------------------#
 
 def read_param(fname, par, type='string'):
     """ Return the value of a parameter, either from the
@@ -168,15 +191,15 @@ def read_param(fname, par, type='string'):
         for line in fn:
             line = re.sub('#.+', '', line)
             if '=' in line:
-                name , _ = line.split('=')
+                name, _ = line.split('=')
                 name = name.strip()
                 if name == par:
                     n_par = n_par + 1
-                    _ , value = line.split('=')
+                    _, value = line.split('=')
                     value = value.strip()
 
-   # If there are duplicated parameters raise an error
-    if n_par>1:
+    # If there are duplicated parameters raise an error
+    if n_par > 1:
         raise IOError('Found duplicated parameter: ' + par)
 
     # If par was not in the file use the default value

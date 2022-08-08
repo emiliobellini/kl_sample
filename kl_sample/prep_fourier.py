@@ -257,8 +257,6 @@ def run_mask(path, fields, z_bins, size_pix, remove_files, want_plots):
 
         # Convert mask to boolean
         mask_sec = 1 - np.array(mask_sec, dtype=bool).astype(np.int8)
-        # TODO_EB: verify that this new is equivalent to the old one
-        # mask_sec = (1-np.array(mask_sec, dtype=bool)).astype(np.int8)
 
         # Determine how many pixels should be grouped together
         # in the degraded mask
@@ -1240,10 +1238,10 @@ def run_cat_sims(path, fields, z_bins, n_sims_cov):
 
         # Generate simulations for each field
         io.path_exists_or_create(path['cat_sims'])
-        print(path['cat_sims'])
         for i in range(n_sims_cov):
+            seed = 1000 + i
             fname = join(path['cat_sims'], 'sim_{}_cat_{}.fits'.format(i, f))
-            get_gaussian_sim(w, masks, cl_matrix, cats, ipixs, i, fname, f)
+            get_gaussian_sim(w, masks, cl_matrix, cats, ipixs, seed, fname, f)
             # Print message every some step
             if (i+1) % 1e2 == 0:
                 print('----> Calculated {0:5.1%} of the simulation catalogues '

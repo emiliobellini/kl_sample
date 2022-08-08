@@ -174,7 +174,7 @@ def get_io_paths(args, fields):
     path['cat_full'] = join(path['input'], 'cat_full.fits')
     path['mask_url'] = join(path['input'], 'mask_url.txt')
     path['photo_z'] = join(path['output'], 'photo_z.fits')
-    if args.badfields_path:
+    if args.cat_sims_path:
         path['cat_sims'] = create(os.path.abspath(args.cat_sims_path))
     else:
         path['cat_sims'] = join(path['output'], 'cat_sims')

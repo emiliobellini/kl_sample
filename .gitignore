@@ -120,3 +120,4 @@ python.sh
 .bashrc
 *~
 *.npz
+scripts/*

@@ -10,6 +10,7 @@ Functions:
 
 import sys
 import os
+import re
 import numpy as np
 import pymaster as nmt
 import kl_sample.io as io
@@ -233,12 +234,13 @@ def is_run_and_check(args, fields, path, n_sims_cov):
         is_run['cl'] = True
     is_run['cat_sims'] = not(ex(path['cat_sims']))
     # Check that all the files are present as well
-    if not(is_run['cat_sims']):
+    if ex(path['cat_sims']):
         is_files = True
         for f in fields:
-            for ns in range(n_sims_cov):
-                is_files = bool(is_files*ex(join(path['cat_sims'],
-                                'sim_{}_cat_{}.fits'.format(ns, f))))
+            sims = [x for x in os.listdir(path['cat_sims'])
+                    if re.match('.+{}\.fits'.format(f), x)]  # noqa:W605
+            if len(sims) != n_sims_cov:
+                is_files = False
         is_run['cat_sims'] = not(is_files)
     if args.run_cat_sims or args.run_all:
         is_run['cat_sims'] = True
@@ -345,12 +347,13 @@ def is_run_and_check(args, fields, path, n_sims_cov):
         nofile1 = np.array([not(ex(path['mask_'+f])) for f in fields]).any()
         nofile2 = np.array([not(ex(path['cl_'+f])) for f in fields]).any()
         nofile3 = not(ex(path['cat_sims']))
-        if not(nofile3):
+        if ex(path['cat_sims']):
             is_files = True
             for f in fields:
-                for ns in range(n_sims_cov):
-                    is_files = bool(is_files*ex(join(path['cat_sims'],
-                                    'sim_{}_cat_{}.fits'.format(ns, f))))
+                sims = [x for x in os.listdir(path['cat_sims'])
+                        if re.match('.+{}\.fits'.format(f), x)]  # noqa:W605
+                if len(sims) != n_sims_cov:
+                    is_files = False
             nofile3 = not(is_files)
         test1 = not(is_run['mask']) and nofile1
         test2 = not(is_run['cl']) and nofile2

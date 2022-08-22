@@ -1117,6 +1117,7 @@ def run_cat_sims(path, fields, z_bins, n_sims_cov):
     n_bins = len(z_bins)
     sign_e2 = -1
     noise_factor = 1
+    seed_ini = 1000
 
     # Define main function
     def get_gaussian_sim(ww, masks, cl_mat, catals, ipixs, seed, fname, field):
@@ -1239,8 +1240,9 @@ def run_cat_sims(path, fields, z_bins, n_sims_cov):
         # Generate simulations for each field
         io.path_exists_or_create(path['cat_sims'])
         for i in range(n_sims_cov):
-            seed = 1000 + i
-            fname = join(path['cat_sims'], 'sim_{}_cat_{}.fits'.format(i, f))
+            seed = seed_ini + i
+            fname = \
+                join(path['cat_sims'], 'sim_{}_cat_{}.fits'.format(seed, f))
             get_gaussian_sim(w, masks, cl_matrix, cats, ipixs, seed, fname, f)
             # Print message every some step
             if (i+1) % 1e2 == 0:

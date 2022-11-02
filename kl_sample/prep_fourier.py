@@ -64,6 +64,8 @@ def prep_fourier(args):
     n_sims_noise = set.N_SIMS_NOISE
     # Bandpowers to calculate Cl's
     bandpowers = set.BANDPOWERS
+    # Do not decouple Cells with mcm
+    keep_cells_coupled = set.KEEP_CELLS_COUPLED
 
     # ----------- Initialize paths -------------------------------------------#
 
@@ -131,7 +133,8 @@ def prep_fourier(args):
     if is_run['cl']:
         start = time.time()
         warning = run_cl(path, fields, z_bins,
-                         bandpowers, n_sims_noise, args.want_plots) or warning
+                         bandpowers, n_sims_noise, keep_cells_coupled,
+                         args.want_plots) or warning
         end = time.time()
         hrs, rem = divmod(end-start, 3600)
         mins, secs = divmod(rem, 60)
@@ -151,7 +154,8 @@ def prep_fourier(args):
 
     if is_run['cl_sims']:
         start = time.time()
-        warning = run_cl_sims(path, fields, z_bins, bandpowers) or warning
+        warning = run_cl_sims(path, fields, z_bins, bandpowers,
+                              keep_cells_coupled) or warning
         end = time.time()
         hrs, rem = divmod(end-start, 3600)
         mins, secs = divmod(rem, 60)
@@ -210,6 +214,20 @@ def run_mask(path, fields, z_bins, size_pix, remove_files, want_plots):
 
     # First loop: scan over the fields and generate new maps
     for f in fields:
+
+        # Check existence of files and in case skip
+        file_exists = os.path.exists(path['mask_'+f])
+        if file_exists is True:
+            keys = io.get_keys_from_fits(path['mask_'+f])
+            mnow = 'MASK_NOW_'+f in keys
+            mzs = all(['MASK_{}_Z{}'.format(f, x+1) in keys
+                      for x in range(len(z_bins))])
+        if file_exists is True and mnow is True and mzs is True:
+            print('----> Skipping MASK calculation for field {}. Output file '
+                  'already there!'.format(f))
+            sys.stdout.flush()
+            continue
+
         print('Calculating mask for field {}:'.format(f))
         sys.stdout.flush()
 
@@ -463,6 +481,18 @@ def run_mult(path, fields, z_bins, n_avg_m, want_plots):
 
     # First loop: scan over the fields
     for f in fields:
+
+        # Check existence of files and in case skip
+        file_exists = os.path.exists(path['m_'+f])
+        if file_exists is True:
+            keys = io.get_keys_from_fits(path['m_'+f])
+            mzs = all(['MULT_CORR_{}_Z{}'.format(f, x+1) in keys
+                      for x in range(len(z_bins))])
+        if file_exists is True and mzs is True:
+            print('----> Skipping MULT_CORR calculation for field {}. Output '
+                  'file already there!'.format(f))
+            sys.stdout.flush()
+            continue
 
         # Remove old output file to avoid confusion
         try:
@@ -811,6 +841,18 @@ def run_cat(path, fields, z_bins):
     # First loop: scan over the fields
     for f in fields:
 
+        # Check existence of files and in case skip
+        file_exists = os.path.exists(path['cat_'+f])
+        if file_exists is True:
+            keys = io.get_keys_from_fits(path['cat_'+f])
+            mzs = all(['CAT_{}_Z{}'.format(f, x+1) in keys
+                      for x in range(len(z_bins))])
+        if file_exists is True and mzs is True:
+            print('----> Skipping CATALOGUE calculation for field {}. Output '
+                  'file already there!'.format(f))
+            sys.stdout.flush()
+            continue
+
         # Remove old output file to avoid confusion
         try:
             os.remove(path['cat_'+f])
@@ -880,6 +922,20 @@ def run_map(path, fields, z_bins, want_plots):
 
     # First loop: scan over the fields
     for f in fields:
+
+        # Check existence of files and in case skip
+        file_exists = os.path.exists(path['map_'+f])
+        if file_exists is True:
+            keys = io.get_keys_from_fits(path['map_'+f])
+            mzs1 = all(['CAT_{}_Z{}_G1'.format(f, x+1) in keys
+                       for x in range(len(z_bins))])
+            mzs2 = all(['CAT_{}_Z{}_G2'.format(f, x+1) in keys
+                       for x in range(len(z_bins))])
+        if file_exists is True and mzs1 is True and mzs2 is True:
+            print('----> Skipping MAP calculation for field {}. Output '
+                  'file already there!'.format(f))
+            sys.stdout.flush()
+            continue
 
         # Remove old output file to avoid confusion
         try:
@@ -959,7 +1015,7 @@ def run_map(path, fields, z_bins, want_plots):
 
 # ------------------- Function to calculate the cl ---------------------------#
 
-def run_cl(path, fields, z_bins, bp, n_sims_noise, want_plots):
+def run_cl(path, fields, z_bins, bp, n_sims_noise, coupled_cell, want_plots):
 
     print('Running CL module')
     sys.stdout.flush()
@@ -967,6 +1023,17 @@ def run_cl(path, fields, z_bins, bp, n_sims_noise, want_plots):
 
     # First loop: scan over the fields
     for f in fields:
+
+        # Check existence of files and in case skip
+        file_exists = os.path.exists(path['cl_'+f])
+        if file_exists is True:
+            keys = io.get_keys_from_fits(path['cl_'+f])
+            mzs = all([x in keys for x in ['ELL_'+f, 'CL_'+f, 'CL_NOISE_'+f]])
+        if file_exists is True and mzs is True:
+            print('----> Skipping CL calculation for field {}. Output '
+                  'file already there!'.format(f))
+            sys.stdout.flush()
+            continue
 
         print('Calculating cl for field {}:'.format(f))
         sys.stdout.flush()
@@ -1032,7 +1099,8 @@ def run_cl(path, fields, z_bins, bp, n_sims_noise, want_plots):
         # Get Cl's
         map = np.transpose(map, axes=(1, 0, 2, 3))
         ell, cl, mcm_paths = \
-            tools.get_cl(f, bp, hd, mask, map, tmp_path=path['output'])
+            tools.get_cl(f, bp, hd, mask, map, coupled_cell,
+                         tmp_path=path['mcm'])
 
         # Save to file the map
         warning = io.write_to_fits(path['cl_'+f], ell, 'ELL_{}'.format(f),
@@ -1064,7 +1132,8 @@ def run_cl(path, fields, z_bins, bp, n_sims_noise, want_plots):
             # Get Cl's
             map = np.transpose(map, axes=(1, 0, 2, 3))
             _, noise_sims[ns], _ = \
-                tools.get_cl(f, bp, hd, mask, map, tmp_path=path['output'])
+                tools.get_cl(f, bp, hd, mask, map, coupled_cell,
+                             tmp_path=path['mcm'])
 
         # Get mean shape noise
         noise = np.mean(noise_sims, axis=0)
@@ -1256,7 +1325,7 @@ def run_cat_sims(path, fields, z_bins, n_sims_cov):
 
 # ------------------- Function to calculate the cl_sims ----------------------#
 
-def run_cl_sims(path, fields, z_bins, bp):
+def run_cl_sims(path, fields, z_bins, bp, coupled_cell):
 
     print('Running CL_SIMS module')
     sys.stdout.flush()
@@ -1265,6 +1334,17 @@ def run_cl_sims(path, fields, z_bins, bp):
 
     # First loop: scan over the fields
     for nf, f in enumerate(fields):
+
+        # Check existence of files and in case skip
+        file_exists = os.path.exists(path['cl_sims_'+f])
+        if file_exists is True:
+            keys = io.get_keys_from_fits(path['cl_sims_'+f])
+            mzs = all([x in keys for x in ['ELL_'+f, 'CL_SIM_'+f]])
+        if file_exists is True and mzs is True:
+            print('----> Skipping CL_SIMS calculation for field {}. Output '
+                  'file already there!'.format(f))
+            sys.stdout.flush()
+            continue
 
         print('Calculating Cls from simulations for field {}:'.format(f))
         sys.stdout.flush()
@@ -1344,7 +1424,8 @@ def run_cl_sims(path, fields, z_bins, bp):
             # Get Cl's
             map = np.transpose(map, axes=(1, 0, 2, 3))
             ell, cl[ns], mcm_paths = \
-                tools.get_cl(f, bp, hd, mask, map, tmp_path=path['output'])
+                tools.get_cl(f, bp, hd, mask, map, coupled_cell,
+                             tmp_path=path['mcm'])
 
             # Print message every some step
             if (ns+1) % 1e2 == 0:

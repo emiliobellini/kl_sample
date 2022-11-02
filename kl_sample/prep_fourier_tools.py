@@ -76,7 +76,7 @@ def get_map(w, mask, cat, pos_in=None):
     return np.array([map_1, map_2]), pos
 
 
-def get_cl(field, bp, hd, mask, map, tmp_path=None):
+def get_cl(field, bp, hd, mask, map, coupled_cell, tmp_path=None):
     """ Generate cl's from a mask and a map.
 
     Args:
@@ -84,6 +84,7 @@ def get_cl(field, bp, hd, mask, map, tmp_path=None):
         bp: bandpowers for ell.
         hd: header with infos about the mask and maps.
         mask: array with mask.
+        coupled_cell: do not decouple cls with mcm (but calculated and stored)
         map: maps for each bin and polarization.
 
     Returns:
@@ -134,7 +135,10 @@ def get_cl(field, bp, hd, mask, map, tmp_path=None):
                 sys.stdout.flush()
             # Calculate Cl's
             cl_c = nmt.compute_coupled_cell_flat(fd[nb1], fd[nb2], b)
-            cl_d = wf.decouple_cell(cl_c)
+            if coupled_cell is True:
+                cl_d = cl_c
+            else:
+                cl_d = wf.decouple_cell(cl_c)
             cl_d = np.reshape(cl_d, (2, 2, n_ells))
             cl[:, :, :, nb1, nb2] = cl_d
             cl[:, :, :, nb2, nb1] = cl_d
@@ -175,6 +179,7 @@ def get_io_paths(args, fields):
     path['cat_full'] = join(path['input'], 'cat_full.fits')
     path['mask_url'] = join(path['input'], 'mask_url.txt')
     path['photo_z'] = join(path['output'], 'photo_z.fits')
+    path['mcm'] = create(join(path['output'], 'mcm'))
     if args.cat_sims_path:
         path['cat_sims'] = create(os.path.abspath(args.cat_sims_path))
     else:
@@ -210,7 +215,6 @@ def is_run_and_check(args, fields, path, n_sims_cov):
     warning = False
     is_run = {}
     ex = os.path.exists
-    join = os.path.join
 
     # Determine which modules have to be run, by checking the existence of the
     # output files and arguments passed by the user

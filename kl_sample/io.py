@@ -363,6 +363,20 @@ def print_info_fits(fname):
     return
 
 
+def get_keys_from_fits(fname):
+    """ Get keys from fits file.
+
+    Args:
+        fname: path of the data file.
+
+    Returns:
+        list of keys.
+
+    """
+    with fits.open(fname) as fn:
+        return [x.name for x in fn]
+
+
 # ------------------- On preliminary data -------------------------------------#
 
 def unpack_simulated_xipm(fname):

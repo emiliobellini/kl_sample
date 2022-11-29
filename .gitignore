@@ -121,3 +121,4 @@ python.sh
 *~
 *.npz
 scripts/*
+init_files/

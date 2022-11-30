@@ -106,6 +106,13 @@ venv.bak/
 # output folder
 output/*
 
+# data folder
+data/*
+!data/data_fourier.fits
+!data/data_fourier_bad.fits
+!data/data_real.fits
+!data/7bins/*
+
 # Other files
 *.out
 *.sh.sh
@@ -113,3 +120,5 @@ python.sh
 .bashrc
 *~
 *.npz
+scripts/*
+init_files/

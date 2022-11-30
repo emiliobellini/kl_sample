@@ -15,7 +15,7 @@ import kl_sample.likelihood as lkl
 import kl_sample.cosmo as cosmo_tools
 
 
-# ------------------- emcee ---------------------------------------------------#
+# ------------------- emcee --------------------------------------------------#
 
 def run_emcee(args, cosmo, data, settings, path):
     """ Run emcee sampler.
@@ -34,36 +34,37 @@ def run_emcee(args, cosmo, data, settings, path):
     # Local variables
     full = cosmo['params']
     mask = cosmo['mask']
-    obs = data['corr_obs']
-    icov = data['inv_cov_mat']
     ns = settings['n_steps']
     nw = settings['n_walkers']
     nt = settings['n_threads']
     nd = len(mask[mask])
 
-    #Print useful stuff
+    # Print useful stuff
     print('Starting the chains!')
     for key in settings.keys():
         print(key + ' = ' + str(settings[key]))
     sys.stdout.flush()
 
-    #Initialize sampler
-    sampler = emcee.EnsembleSampler(nw, nd, lkl.lnprob, args=[full, mask, data, settings], threads=nt)
-
+    # Initialize sampler
+    sampler = emcee.EnsembleSampler(nw, nd, lkl.lnprob,
+                                    args=[full, mask, data, settings],
+                                    threads=nt)
 
     if args.restart:
         # Initial point from data
-        vars_0 = np.loadtxt(path['output'],unpack=True)
+        vars_0 = np.loadtxt(path['output'], unpack=True)
         vars_0 = vars_0[2:2+nd]
-        vars_0 = vars_0[:,-nw:].T
+        vars_0 = vars_0[:, -nw:].T
     else:
         # Initial point
-        vars_0 = np.array([lkl.get_random(full[mask], 1.e3) for x in range(nw)])
+        vars_0 = \
+            np.array([lkl.get_random(full[mask], 1.e3) for x in range(nw)])
         # Create file
         f = open(path['output'], 'w')
         f.close()
 
-    for count, result in enumerate(sampler.sample(vars_0, iterations=ns, storechain=False)):
+    for count, result in enumerate(sampler.sample(vars_0, iterations=ns,
+                                   storechain=False)):
         pos = result[0]
         prob = result[1]
         f = open(path['output'], 'a')
@@ -72,13 +73,14 @@ def run_emcee(args, cosmo, data, settings, path):
             out = np.append(out, cosmo_tools.get_sigma_8(pos[k], full, mask))
             f.write('    '.join(['{0:.10e}'.format(x) for x in out]) + '\n')
         f.close()
-        print('----> Computed ' + '{0:5.1%}'.format(float(count+1) / ns) + ' of the steps')
+        print('----> Computed {0:5.1%} of the steps'
+              ''.format(float(count+1) / ns))
         sys.stdout.flush()
 
     return
 
 
-# ------------------- single_point --------------------------------------------#
+# ------------------- single_point -------------------------------------------#
 
 def run_single_point(cosmo, data, settings):
     """ Run emcee sampler.
@@ -97,10 +99,8 @@ def run_single_point(cosmo, data, settings):
     # Local variables
     full = cosmo['params']
     mask = cosmo['mask']
-    obs = data['corr_obs']
-    icov = data['inv_cov_mat']
 
-    var = full[:,1][mask]
+    var = full[:, 1][mask]
     post = lkl.lnprob(var, full, mask, data, settings)
     sigma8 = cosmo_tools.get_sigma_8(var, full, mask)
 

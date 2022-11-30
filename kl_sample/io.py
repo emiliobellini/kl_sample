@@ -220,9 +220,9 @@ def read_param(fname, par, type='string'):
         return os.path.abspath(value)
     # Boolean type considers only the first letter (case insensitive)
     elif type == 'bool':
-        if re.match('y.+', value, re.IGNORECASE):
+        if re.match('y.*', value, re.IGNORECASE):
             return True
-        elif re.match('n.+', value, re.IGNORECASE):
+        elif re.match('n.*', value, re.IGNORECASE):
             return False
         else:
             raise IOError('Boolean type for ' + par + ' not recognized!')
@@ -232,12 +232,12 @@ def read_param(fname, par, type='string'):
     elif type == 'cosmo':
         try:
             return np.array([float(value), float(value), float(value)])
-        except:
+        except ValueError:
             try:
                 array = value.split(',')
                 array = [x.strip() for x in array]
-                return [None if x=='None' else float(x) for x in array]
-            except:
+                return [None if x == 'None' else float(x) for x in array]
+            except ValueError:
                 return value
     # All other types (such as strings) will be returned as strings
     else:
@@ -269,7 +269,7 @@ def read_cosmo_array(fname, pars):
         value = read_param(fname, par, type='cosmo')
         # Check that the parameter has the correct shape and
         # it is not a string
-        if len(value)==3 and type(value) is not str:
+        if len(value) == 3 and type(value) is not str:
             cosmo_params.append(value)
         else:
             raise IOError('Check the value of ' + par + '!')
@@ -277,7 +277,7 @@ def read_cosmo_array(fname, pars):
     return np.array(cosmo_params)
 
 
-# ------------------- FITS files ----------------------------------------------#
+# ------------------- FITS files ---------------------------------------------#
 
 def read_from_fits(fname, name):
     """ Open a fits file and read data from it.
@@ -332,11 +332,11 @@ def write_to_fits(fname, array, name, type='image', header=None):
     with fits.open(fname, mode='update') as hdul:
         try:
             hdul.__delitem__(name)
-        except:
+        except KeyError:
             pass
-        if type=='image':
+        if type == 'image':
             hdul.append(fits.ImageHDU(array, name=name, header=header))
-        elif type=='table':
+        elif type == 'table':
             hdul.append(array)
         else:
             print('Type '+type+' not recognized! Data not saved to file!')
@@ -377,7 +377,7 @@ def get_keys_from_fits(fname):
         return [x.name for x in fn]
 
 
-# ------------------- On preliminary data -------------------------------------#
+# ------------------- On preliminary data ------------------------------------#
 
 def unpack_simulated_xipm(fname):
     """ Unpack a tar file containing the simulated
@@ -415,17 +415,21 @@ def unpack_simulated_xipm(fname):
             for nb1 in range(n_bins):
                 for nb2 in range(nb1, n_bins):
                     # Modify the base name to get the actual one
-                    new_name = base_name.replace('maskCLW1', 'maskCLW{0:01d}'.format(nf+1))
-                    new_name = new_name.replace('real0001', 'real{0:04d}'.format(ns+1))
-                    new_name = new_name.replace('z1_athena', 'z{0:01d}_athena'.format(nb1+1))
-                    new_name = new_name.replace('blind1_z1', 'blind1_z{0:01d}'.format(nb2+1))
-                    # For each bin pair calculate the position on the final array
-                    pos = np.flip(np.arange(n_bins+1),0)[:nb1].sum()
+                    new_name = base_name.replace('maskCLW1', 'maskCLW{0:01d}'
+                                                 ''.format(nf+1))
+                    new_name = new_name.replace('real0001', 'real{0:04d}'
+                                                ''.format(ns+1))
+                    new_name = new_name.replace('z1_athena', 'z{0:01d}_athena'
+                                                ''.format(nb1+1))
+                    new_name = new_name.replace('blind1_z1', 'blind1_z{0:01d}'
+                                                ''.format(nb2+1))
+                    # For each bin pair calculate position on the final array
+                    pos = np.flip(np.arange(n_bins+1), 0)[:nb1].sum()
                     pos = (pos + nb2 - nb1)*2*n_theta
                     # Extract file and read it only if it is not None
                     fn = np.loadtxt(fname+new_name)
                     # Read xi_plus and xi_minus and stack them
-                    xi = np.hstack((fn[:,1], fn[:,2]))
+                    xi = np.hstack((fn[:, 1], fn[:, 2]))
                     # Write imported data on final array
                     for i, xi_val in enumerate(xi):
                         xipm_sims[nf, ns, pos+i] = xi_val
@@ -453,8 +457,9 @@ def read_photo_z_data(fname):
 
     # Local variables
     z_bins = set.Z_BINS
-    sel_bins = np.array([set.filter_galaxies(table, z_bins[n][0], z_bins[n][1]) for n in range(len(z_bins))])
-    photo_z = np.zeros((len(z_bins)+1,len(image[0])))
+    sel_bins = np.array([set.filter_galaxies(table, z_bins[n][0], z_bins[n][1])
+                        for n in range(len(z_bins))])
+    photo_z = np.zeros((len(z_bins)+1, len(image[0])))
     n_eff = np.zeros(len(z_bins))
     sigma_g = np.zeros(len(z_bins))
     photo_z[0] = (np.arange(len(image[0]))+1./2.)*set.dZ_CFHTlens
@@ -469,11 +474,13 @@ def read_photo_z_data(fname):
         e2 = table['e2'][sel_bins[n]]-table['c2'][sel_bins[n]]/(1+m)
 
         # photo_z
-        photo_z[n+1] = np.dot(table['weight'][sel_bins[n]], image[sel_bins[n]])/w_sum
+        photo_z[n+1] = np.dot(table['weight'][sel_bins[n]],
+                              image[sel_bins[n]])/w_sum
         # n_eff
         n_eff[n] = w_sum**2/w2_sum/set.A_CFHTlens.sum()
         # sigma_g
-        sigma_g[n] = np.dot(table['weight'][sel_bins[n]]**2., (e1**2. + e2**2.)/2.)/w2_sum
+        sigma_g[n] = np.dot(table['weight'][sel_bins[n]]**2.,
+                            (e1**2. + e2**2.)/2.)/w2_sum
         sigma_g[n] = sigma_g[n]**0.5
 
         # Print progress message

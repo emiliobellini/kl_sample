@@ -312,8 +312,7 @@ def get_random(pars, squeeze):
         if (lb == -np.inf) and (rb == np.inf):
             rnd = pars[count][1] + 2.*(np.random.rand()-.5)/squeeze
         else:
-            rnd = pars[count][1] + 2.*(np.random.rand()-.5)*
-                min(rb-pars[count][1], pars[count][1]-lb)/squeeze
+            rnd = pars[count][1] + 2.*(np.random.rand()-.5)*min(rb-pars[count][1], pars[count][1]-lb)/squeeze
         rnd_pars = np.append(rnd_pars, rnd)
 
     return rnd_pars

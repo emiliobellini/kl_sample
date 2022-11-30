@@ -187,7 +187,10 @@ def run(args):
         cov = rsh.flatten_covmat(cov, is_diag=is_diag)
         factor = \
             (settings['n_sims']-settings['n_data']-2.)/(settings['n_sims']-1.)
-        data['inv_cov_mat'] = factor*np.linalg.inv(cov)
+        if set.PINV:
+            data['inv_cov_mat'] = factor*np.linalg.pinv(cov)
+        else:
+            data['inv_cov_mat'] = factor*np.linalg.inv(cov)
 
     # ------------------- Run ------------------------------------------------#
 

@@ -104,7 +104,10 @@ def compute_kl(params, pz, noise, ell_min=2, ell_max=2000, scale_dep=False,
     # Cholesky decomposition of noise (N=LL^+)
     N = noise[ell_min:ell_max+1]
     L = np.linalg.cholesky(N)
-    inv_L = np.linalg.inv(L)
+    if set.PINV:
+        inv_L = np.linalg.pinv(L)
+    else:
+        inv_L = np.linalg.inv(L)
 
     # Matrix for which we want to calculate eigenvalues and eigenvectors
     M = np.array([np.dot(inv_L[x], S[x]+N[x]) for x in range(len(S))])
@@ -206,16 +209,26 @@ def compute_inv_covmat(data, settings):
     inv_cov_tot = np.zeros((n_data, n_data))
     for nf in range(n_fields):
         cov[nf] = np.cov(corr[nf].T)
-        inv_cov_tot = inv_cov_tot + A_c[nf]/A_s[nf]*np.linalg.inv(cov[nf])
+        if set.PINV:
+            inv_cov_tot = inv_cov_tot + A_c[nf]/A_s[nf]*np.linalg.pinv(cov[nf])
+        else:
+            inv_cov_tot = inv_cov_tot + A_c[nf]/A_s[nf]*np.linalg.inv(cov[nf])
 
     # Invert and mask
-    cov_tot = np.linalg.inv(inv_cov_tot)
+    if set.PINV:
+        cov_tot = np.linalg.pinv(inv_cov_tot)
+    else:
+        cov_tot = np.linalg.inv(inv_cov_tot)
     cov_tot = rsh.mask_xipm(cov_tot, data['mask_theta_ell'], settings)
     cov_tot = rsh.mask_xipm(cov_tot.T, data['mask_theta_ell'], settings)
 
     # Add overall normalization
     n_data_mask = cov_tot.shape[0]
-    inv_cov_tot = (n_sims-n_data_mask-2.)/(n_sims-1.)*np.linalg.inv(cov_tot)
+    factor = (n_sims-n_data_mask-2.)/(n_sims-1.)
+    if set.PINV:
+        inv_cov_tot = factor*np.linalg.pinv(cov_tot)
+    else:
+        inv_cov_tot = factor*np.linalg.inv(cov_tot)
 
     return inv_cov_tot
 

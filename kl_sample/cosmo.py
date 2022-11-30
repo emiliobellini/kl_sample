@@ -221,7 +221,8 @@ def get_theory(var, full, mask, data, settings):
         corr = rsh.mask_xipm(corr, data['mask_theta_ell'], settings)
     else:
         corr = rsh.mask_cl(corr, is_diag=is_diag)
-        corr = rsh.unify_fields_cl(corr, data['cov_pf'], is_diag=is_diag)
+        corr = rsh.unify_fields_cl(corr, data['cov_pf'], is_diag=is_diag,
+                                   pinv=set.PINV)
         corr = rsh.flatten_cl(corr, is_diag=is_diag)
 
     return corr

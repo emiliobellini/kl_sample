@@ -14,6 +14,7 @@ Functions:
 
 """
 
+import os
 import numpy as np
 import kl_sample.settings as set
 import pymaster as nmt
@@ -166,7 +167,8 @@ def couple_decouple_cl(ell, cl, mcm_path, n_fields, n_bins, n_bp, return_BB=Fals
         for nb2 in range(nb1,n_bins):
             for nf in range(n_fields):
                 wf = nmt.NmtWorkspaceFlat()
-                wf.read_from(mcm_path+'mcm_W{}_Z{}{}.dat'.format(nf+1,nb1+1,nb2+1))
+                wf.read_from(os.path.join(
+                    mcm_path, 'mcm_W{}_Z{}{}.dat'.format(nf+1, nb1+1, nb2+1)))
                 cl_pfb = wf.couple_cell(ell, nmt_cl[nb1,nb2])
                 cl_pfb = wf.decouple_cell(cl_pfb)
                 final_cl[nf, nb1, nb2] = cl_pfb[0]

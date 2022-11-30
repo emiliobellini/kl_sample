@@ -36,7 +36,7 @@ def unused_params(cosmo, settings, path):
     """
 
     # Join together all the parameters read
-    params = np.hstack((cosmo['names'], settings.keys(), path.keys()))
+    params = np.hstack((cosmo['names'], list(settings.keys()), list(path.keys())))
 
     # Scroll all the parameter to see if there are unused ones
     with open(path['params']) as fn:

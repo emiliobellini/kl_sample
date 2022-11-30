@@ -32,6 +32,12 @@ MASK_ELL = np.array([False,  True,  True,  True,  True,  True, False])
 KEEP_CELLS_COUPLED = False
 BANDPOWERS = np.vstack((BANDPOWERS[:-1], BANDPOWERS[1:])).T
 
+# Use pseudo-inverse instead of inverse.
+PINV = True
+
+# Theory from.
+# THEORY = 'CCL'
+THEORY = 'Camera'
 
 # CFHTlens specifications plus area of simulations
 FIELDS_CFHTLENS = ['W'+str(x+1) for x in range(4)]

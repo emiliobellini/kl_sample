@@ -35,11 +35,12 @@ KEEP_CELLS_COUPLED = False
 BANDPOWERS = np.vstack((BANDPOWERS[:-1], BANDPOWERS[1:])).T
 
 # Use pseudo-inverse instead of inverse.
-PINV = True
+PINV = False  # Default
+# PINV = True  # Camera
 
 # Theory from.
-THEORY = 'CCL' # Default
-# THEORY = 'Camera' # Camera
+THEORY = 'CCL'  # Default
+# THEORY = 'Camera'  # Camera
 
 # CFHTlens specifications plus area of simulations
 FIELDS_CFHTLENS = ['W'+str(x+1) for x in range(4)]

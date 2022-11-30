@@ -148,17 +148,6 @@ def run(args):
         lkl.how_many_sims(settings['n_sims'], settings['n_sims_tot'],
                           settings['n_data'], settings['n_data_tot'])
     data['corr_sim'] = lkl.select_sims(data, settings)
-    if settings['space'] == 'fourier':
-        # Mask observed Cl's
-        data['corr_obs'] = rsh.mask_cl(data['corr_obs'], is_diag=is_diag)
-        # Mask sims Cl's
-        data['corr_sim'] = rsh.mask_cl(data['corr_sim'], is_diag=is_diag)
-        # Unify fields
-        data['cov_pf'] = rsh.get_covmat_cl(data['corr_sim'], is_diag=is_diag)
-        data['corr_obs'] = rsh.unify_fields_cl(data['corr_obs'],
-                                               data['cov_pf'], is_diag=is_diag)
-        data['corr_sim'] = rsh.unify_fields_cl(data['corr_sim'],
-                                               data['cov_pf'], is_diag=is_diag)
 
     # Prepare data if real
     if settings['space'] == 'real':
@@ -180,6 +169,15 @@ def run(args):
 
     # Prepare data if fourier
     else:
+        # Mask Cl's
+        data['corr_obs'] = rsh.mask_cl(data['corr_obs'], is_diag=is_diag)
+        data['corr_sim'] = rsh.mask_cl(data['corr_sim'], is_diag=is_diag)
+        # Unify fields
+        data['cov_pf'] = rsh.get_covmat_cl(data['corr_sim'], is_diag=is_diag)
+        data['corr_obs'] = rsh.unify_fields_cl(data['corr_obs'],
+                                               data['cov_pf'], is_diag=is_diag)
+        data['corr_sim'] = rsh.unify_fields_cl(data['corr_sim'],
+                                               data['cov_pf'], is_diag=is_diag)
         # Reshape observed Cl's
         data['corr_obs'] = rsh.flatten_cl(data['corr_obs'], is_diag=is_diag)
         # Calculate covmat Cl's

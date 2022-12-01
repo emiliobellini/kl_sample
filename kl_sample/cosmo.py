@@ -186,6 +186,10 @@ def get_theory(var, full, mask, data, settings):
     pz = data['photo_z']
     theta = data['theta_ell']
     ell_max = settings['ell_max']
+    bp = settings['bp_ell']
+    ell = np.arange(bp[-1, -1] + 1)
+    nf = settings['n_fields']
+    nb = settings['n_bins']
 
     # Merge in a single array varying and fixed parameters
     pars = np.empty(len(mask))
@@ -203,14 +207,9 @@ def get_theory(var, full, mask, data, settings):
         corr = get_cls_ccl(pars, cosmo, pz, ell_max, add_ia=settings['add_ia'])
         if settings['space'] == 'real':
             corr = get_xipm_ccl(cosmo, corr, theta)
-        else:
-            bp = settings['bp_ell']
-            ell = np.arange(bp[-1, -1] + 1)
-            nf = settings['n_fields']
-            nb = settings['n_bins']
     elif set.THEORY == 'Camera':
         # TODO: implement here
-        corr = np.ones((4, 9, 7, 7))
+        corr = np.ones((1311, 7, 7))
 
     # Keep cls coupled or not
     if set.KEEP_CELLS_COUPLED:

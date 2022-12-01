@@ -208,11 +208,16 @@ def get_theory(var, full, mask, data, settings):
             ell = np.arange(bp[-1, -1] + 1)
             nf = settings['n_fields']
             nb = settings['n_bins']
-            corr = rsh.couple_decouple_cl(ell, corr, settings['mcm'],
-                                          nf, nb, len(bp))
     elif set.THEORY == 'Camera':
         # TODO: implement here
         corr = np.ones((4, 9, 7, 7))
+
+    # Keep cls coupled or not
+    if set.KEEP_CELLS_COUPLED:
+        corr = rsh.couple_cl(ell, corr, settings['mcm'], nf, nb, len(bp))
+    else:
+        corr = rsh.couple_decouple_cl(ell, corr, settings['mcm'], nf, nb,
+                                      len(bp))
 
     # Apply KL
     if settings['method'] in ['kl_off_diag', 'kl_diag']:

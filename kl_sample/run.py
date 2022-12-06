@@ -192,6 +192,11 @@ def run(args):
         else:
             data['inv_cov_mat'] = factor*np.linalg.inv(cov)
 
+    # Import Camera's template
+    if set.THEORY == 'Camera':
+        settings['cls_template'] = \
+            io.import_template_Camera(set.CLS_TEMPLATE, settings)
+
     # ------------------- Run ------------------------------------------------#
 
     if settings['sampler'] == 'emcee':

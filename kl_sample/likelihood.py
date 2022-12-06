@@ -256,7 +256,7 @@ def lnprior(var, full, mask):
     return -np.inf
 
 
-def lnlike(var, full, mask, data, settings):
+def lnlike(var, full, mask, data, settings, save_loc=None):
     """
 
     Function containing the likelihood.
@@ -286,6 +286,15 @@ def lnlike(var, full, mask, data, settings):
 
     obs = data['corr_obs']
     icov = data['inv_cov_mat']
+
+    if save_loc:
+        z = np.array([(x[0]+x[1])/2. for x in set.Z_BINS])
+        ell = np.array([(x[0]+x[1])/2. for x in set.BANDPOWERS[set.MASK_ELL]])
+        np.savetxt(save_loc + 'z.txt', z)
+        np.savetxt(save_loc + 'ell.txt', ell)
+        np.savetxt(save_loc + 'cell_th.txt', th)
+        np.savetxt(save_loc + 'cell_obs.txt', obs)
+        np.savetxt(save_loc + 'cov_mat.txt', np.linalg.pinv(icov))
 
     # Get chi2
     chi2 = (obs-th).dot(icov).dot(obs-th)

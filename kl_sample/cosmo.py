@@ -202,14 +202,23 @@ def get_theory(var, full, mask, data, settings):
             count1 = count1+1
 
     # Get corr
+    cosmo = get_cosmo_ccl(pars)
     if set.THEORY == 'CCL':
-        cosmo = get_cosmo_ccl(pars)
         corr = get_cls_ccl(pars, cosmo, pz, ell_max, add_ia=settings['add_ia'])
         if settings['space'] == 'real':
             corr = get_xipm_ccl(cosmo, corr, theta)
     elif set.THEORY == 'Camera':
-        # TODO: implement here
-        corr = np.ones((1311, 7, 7))
+        corr = settings['cls_template']
+        Om = (pars[1] + pars[2])/pars[0]**2.
+        s8 = get_sigma_8(var, full, mask)
+        Oms8 = np.zeros(len(set.Z_BINS))
+        for nbin, bin in enumerate(set.Z_BINS):
+            z = (bin[0] + bin[1])/2.
+            D = cosmo.growth_factor(1./(1. + z))
+            Oms8[nbin] = D*Om*s8
+        corr = mult_elementwiselastaxis(corr, Oms8)
+        corr = np.moveaxis(corr, [-2], [-1])
+        corr = mult_elementwiselastaxis(corr, Oms8)
 
     # Keep cls coupled or not
     if set.KEEP_CELLS_COUPLED:
@@ -254,3 +263,10 @@ def get_sigma_8(var, full, mask):
     sigma8 = ccl.sigma8(cosmo)
 
     return sigma8
+
+
+def mult_elementwiselastaxis(A, B):
+    C = np.outer(A, B)
+    C = C.reshape(A.shape+B.shape)
+    C = np.diagonal(C, axis1=-2, axis2=-1)
+    return C

@@ -488,3 +488,18 @@ def read_photo_z_data(fname):
         sys.stdout.flush()
 
     return photo_z, n_eff, sigma_g
+
+
+# ------------------- Import template Camers ---------------------------------#
+
+def import_template_Camera(path, settings):
+    ell_max = settings['ell_max']
+    nb = settings['n_bins']
+    file = np.genfromtxt(path, unpack=True)
+    rell = int(file[0].min()), int(file[0].max())
+    corr = np.zeros((ell_max+1, nb, nb))
+    triu_r, triu_c = np.triu_indices(nb)
+    for n, _ in enumerate(range(int(nb*(nb+1)/2))):
+        corr[rell[0]:rell[1]+1, triu_r[n], triu_c[n]] = file[n+1]
+        corr[rell[0]:rell[1]+1, triu_c[n], triu_r[n]] = file[n+1]
+    return corr

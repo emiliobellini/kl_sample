@@ -216,6 +216,7 @@ def get_theory(var, full, mask, data, settings):
             z = (bin[0] + bin[1])/2.
             D = cosmo.growth_factor(1./(1. + z))
             Oms8[nbin] = D*Om*s8
+        # Multiply twice the template by Oms8 array along the last two axes
         corr = mult_elementwiselastaxis(corr, Oms8)
         corr = np.moveaxis(corr, [-2], [-1])
         corr = mult_elementwiselastaxis(corr, Oms8)

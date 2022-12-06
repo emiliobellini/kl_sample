@@ -46,6 +46,24 @@ def clean_cl(cl, noise):
 
 
 def flatten_cl(cl, is_diag=False):
+    """
+    Given a cl array with shape (A, ell, z_bin_1, z_bin_2), where A stands
+    for additional shape indices (it can be the number of simulations,
+    number of fields, ...), return a flattened one with shape (A, s).
+    In practise only the ells and z_bins are flattened, piling triangle up
+    indices for each ell, i.e.:
+    cl[A, 0, 0, 0]
+    cl[A, 0, 0, 1]
+    ...
+    cl[A, 0, 0, z_bins]
+    cl[A, 0, 1, 1]
+    ...
+    cl[A, 0, z_bins, z_bins]
+    cl[A, 1, 0, 0]
+    cl[A, ell_bins, z_bins, z_bins]
+    If is_diag, the input array should have this shape (A, ell, z_bin).
+    In this case, the flatten process just flattens the last two indices.
+    """
     flat_cl = cl
     if not is_diag:
         tr_idx = np.triu_indices(cl.shape[-1])
@@ -58,6 +76,13 @@ def flatten_cl(cl, is_diag=False):
 
 
 def unflatten_cl(cl, shape, is_diag=False):
+    """
+    Given a cl flattened array (see flatten_cl for details on the structure)
+    return an array with shape (A, ell, z_bin_1, z_bin_2), where A stands
+    for additional shape indices (it can be the number of simulations,
+    number of fields, ...).
+    If is_diag, the final shape will be (A, ell, z_bin).
+    """
     if is_diag:
         unflat_cl = cl.reshape(shape)
     else:
@@ -74,6 +99,15 @@ def unflatten_cl(cl, shape, is_diag=False):
 
 
 def flatten_covmat(cov, is_diag=False):
+    """
+    Given a cov_mat array with shape
+    (A, ell_c1, ell_c2, z_bin_c1_1, z_bin_c2_1, z_bin_c1_2, z_bin_c2_2),
+    where c1 and c2 stand for the first and second cls and  A
+    for additional shape indices (it can be the number of simulations,
+    number of fields, ...), return a A+square array with shape (A, s, s).
+    This function just applies twice flatten_cl on the different indices of
+    the covariance matrix.
+    """
     if is_diag:
         flat_cov = np.moveaxis(cov, [-3, -2], [-2, -3])
         idx = 2
@@ -87,6 +121,15 @@ def flatten_covmat(cov, is_diag=False):
 
 
 def unflatten_covmat(cov, cl_shape, is_diag=False):
+    """
+    Given a covmat flattened array (see flatten_covmat for details on the
+    structure) return an array with shape
+    (A, ell_c1, ell_c2, z_bin_c1_1, z_bin_c2_1, z_bin_c1_2, z_bin_c2_2),
+    where A stands for additional shape indices (it can be the number of
+    simulations, number of fields, ...).
+    This function just applies twice unflatten_cl on the different indices of
+    the covariance matrix.
+    """
     unflat_cov = np.apply_along_axis(unflatten_cl, -1, cov, cl_shape, is_diag)
     unflat_cov = np.apply_along_axis(unflatten_cl, -1-len(cl_shape),
                                      unflat_cov, cl_shape, is_diag)

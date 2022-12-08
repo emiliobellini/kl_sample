@@ -22,25 +22,31 @@ MASK_THETA = np.array([
                [False, False, False,  True,  True,  True,  True]
                ])
 
-
+# Default settings
 # Bandpowers to calculate Cl's (minimum, maximum and intermediate bins)
-# Default
 BANDPOWERS = [30, 80, 260, 450, 670, 1310, 2300, 5100]
 MASK_ELL = np.array([False,  True,  True,  True,  True,  True, False])
 KEEP_CELLS_COUPLED = False
-# Camera
+# Use pseudo-inverse instead of inverse.
+PINV = False
+# Theory from.
+THEORY = 'CCL'
+BNT = False
+
+# # Camera settings
+# # Bandpowers to calculate Cl's (minimum, maximum and intermediate bins)
 # BANDPOWERS = [30, 96, 110, 130, 159, 207, 237, 259, 670, 1310]
 # MASK_ELL = np.array([True, True, True, True, True, True, True, False, False])
 # KEEP_CELLS_COUPLED = True
+# # Use pseudo-inverse instead of inverse.
+# PINV = True
+# # Theory from.
+# THEORY = 'Camera'
+# # Template file
+# CLS_TEMPLATE = 'data/Cls_template_Camera.txt'
+# BNT = True
+
 BANDPOWERS = np.vstack((BANDPOWERS[:-1], BANDPOWERS[1:])).T
-
-# Use pseudo-inverse instead of inverse.
-PINV = False  # Default
-# PINV = True  # Camera
-
-# Theory from.
-THEORY = 'CCL'  # Default
-# THEORY = 'Camera'  # Camera
 
 # CFHTlens specifications plus area of simulations
 FIELDS_CFHTLENS = ['W'+str(x+1) for x in range(4)]

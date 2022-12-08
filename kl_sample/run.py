@@ -136,6 +136,11 @@ def run(args):
 
     # ------------------- Preliminary computations ---------------------------#
 
+    if set.BNT:
+        data['photo_z'] = io.read_from_fits(path['data'], 'photo_z')
+        bnt = cosmo_tools.BNT(cosmo['params'], data['photo_z'])
+        data['bnt_mat'] = bnt.get_matrix()
+
     # Apply KL
     if settings['method'] in ['kl_off_diag', 'kl_diag']:
         data['corr_obs'] = \
@@ -180,6 +185,12 @@ def run(args):
         data['corr_sim'] = rsh.unify_fields_cl(data['corr_sim'],
                                                data['cov_pf'], is_diag=is_diag,
                                                pinv=set.PINV)
+        # Apply BNT if required
+        if set.BNT:
+            data['corr_obs'] = \
+                cosmo_tools.apply_bnt(data['corr_obs'], data['bnt_mat'])
+            data['corr_sim'] = \
+                cosmo_tools.apply_bnt(data['corr_sim'], data['bnt_mat'])
         # Reshape observed Cl's
         data['corr_obs'] = rsh.flatten_cl(data['corr_obs'], is_diag=is_diag)
         # Calculate covmat Cl's

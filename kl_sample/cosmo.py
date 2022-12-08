@@ -244,6 +244,9 @@ def get_theory(var, full, mask, data, settings):
         corr = rsh.mask_cl(corr, is_diag=is_diag)
         corr = rsh.unify_fields_cl(corr, data['cov_pf'], is_diag=is_diag,
                                    pinv=set.PINV)
+        # Apply BNT if required
+        if set.BNT:
+            corr = apply_bnt(corr, data['bnt_mat'])
         corr = rsh.flatten_cl(corr, is_diag=is_diag)
 
     return corr
@@ -271,3 +274,43 @@ def mult_elementwiselastaxis(A, B):
     C = C.reshape(A.shape+B.shape)
     C = np.diagonal(C, axis1=-2, axis2=-1)
     return C
+
+
+class BNT(object):
+
+    def __init__(self, params, photo_z):
+        cosmo = get_cosmo_ccl(params[:, 1])
+        self.z = photo_z[0]  # np.array of redshifts
+        self.chi = cosmo.comoving_radial_distance(1./(1.+photo_z[0]))
+        self.n_i_list = photo_z[1:]
+        self.nbins = len(self.n_i_list)
+
+    def get_matrix(self):
+        A_list = []
+        B_list = []
+        for i in range(self.nbins):
+            nz = self.n_i_list[i]
+            A_list += [np.trapz(nz, self.z)]
+            B_list += [np.trapz(nz / self.chi, self.z)]
+
+        BNT_matrix = np.eye(self.nbins)
+        BNT_matrix[1, 0] = -1.
+
+        for i in range(2, self.nbins):
+            mat = np.array([[A_list[i-1], A_list[i-2]],
+                            [B_list[i-1], B_list[i-2]]])
+            A = -1. * np.array([A_list[i], B_list[i]])
+            soln = np.dot(np.linalg.inv(mat), A)
+            BNT_matrix[i, i-1] = soln[0]
+            BNT_matrix[i, i-2] = soln[1]
+
+        print(BNT_matrix[1])
+        print(BNT_matrix[:,1])
+        return BNT_matrix
+
+
+def apply_bnt(cl, bnt):
+    bnt_cl = np.dot(cl, bnt)
+    bnt_cl = np.moveaxis(bnt_cl, [-1], [-2])
+    bnt_cl = np.dot(bnt_cl, bnt)
+    return bnt_cl

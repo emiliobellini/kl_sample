@@ -304,8 +304,6 @@ class BNT(object):
             BNT_matrix[i, i-1] = soln[0]
             BNT_matrix[i, i-2] = soln[1]
 
-        print(BNT_matrix[1])
-        print(BNT_matrix[:,1])
         return BNT_matrix
 
 

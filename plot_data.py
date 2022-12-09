@@ -27,4 +27,4 @@ cl_EE = rsh.unify_fields_cl(cl_EE, cov_pf)
 noise_EE = rsh.unify_fields_cl(noise_EE, cov_pf)
 sims_EE = rsh.unify_fields_cl(sims_EE, cov_pf)
 
-print cl_EE.shape, sims_EE.shape, cov_pf.shape
+print(cl_EE.shape, sims_EE.shape, cov_pf.shape)

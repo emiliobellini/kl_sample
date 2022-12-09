@@ -23,11 +23,10 @@ import sys
 import re
 import numpy as np
 from astropy.io import fits
-import settings as set
+import kl_sample.settings as set
 
 
-
-# ------------------- Parser --------------------------------------------------#
+# ------------------- Parser -------------------------------------------------#
 
 def argument_parser():
     """ Call the parser to read command line arguments.
@@ -41,11 +40,11 @@ def argument_parser():
     """
 
     parser = argparse.ArgumentParser(
-    'Sample the cosmological parameter space using lensing data.'
-    )
+        'Sample the cosmological parameter space using lensing data.')
 
-    #Add supbarser to select between run and prep modes.
-    subparsers = parser.add_subparsers(dest='mode',
+    # Add supbarser to select between run and prep modes.
+    subparsers = parser.add_subparsers(
+        dest='mode',
         help='Options are: '
         '(i) prep_real: prepare data in real space. '
         '(ii) prep_fourier: prepare data in fourier space. '
@@ -60,46 +59,76 @@ def argument_parser():
     plots_parser = subparsers.add_parser('plots')
     get_kl_parser = subparsers.add_parser('get_kl')
 
-    #Arguments for 'run'
+    # Arguments for 'run'
     run_parser.add_argument('params_file', type=str, help='Parameters file')
-    run_parser.add_argument('--restart', '-r', help='Restart the chains'
-        'from the last point of the output file (only for emcee)',
+    run_parser.add_argument(
+        '--restart', '-r', help='Restart the chains from the last point '
+        'of the output file (only for emcee)', action='store_true')
+
+    # Arguments for 'prep_real'
+    prep_real_parser.add_argument(
+        'input_folder', type=str, help='Input folder.')
+
+    # Arguments for 'prep_fourier'
+    prep_fourier_parser.add_argument(
+        'input_path', type=str, help='Input folder. Files that should contain:'
+        ' cat_full.fits, mask_arcsec_N.fits.gz (N=1,..,4), mask_url.txt. '
+        'See description in kl_sample/prep_fourier.py for more details.')
+    prep_fourier_parser.add_argument(
+        '--output_path', '-o', type=str, help='Output folder.')
+    prep_fourier_parser.add_argument(
+        '--badfields_path', '-bp', type=str, help='Folder where the bad fields'
+        ' mask are stored, or where they well be downloaded.')
+    prep_fourier_parser.add_argument(
+        '--cat_sims_path', '-cp', type=str, help='Folder where the catalogues'
+        ' of the simulations are stored, or where they well be downloaded.')
+    prep_fourier_parser.add_argument(
+        '--run_all', '-a', help='Run all routines even if the files are '
+        'already present', action='store_true')
+    prep_fourier_parser.add_argument(
+        '--run_mask', '-mk', help='Run mask routine even if the files are '
+        'already present', action='store_true')
+    prep_fourier_parser.add_argument(
+        '--run_mult', '-m', help='Run multiplicative correction routine even '
+        'if the files are already present', action='store_true')
+    prep_fourier_parser.add_argument(
+        '--run_pz', '-pz', help='Run photo_z routine even if the files are '
+        'already present', action='store_true')
+    prep_fourier_parser.add_argument(
+        '--run_cat', '-c', help='Run catalogue routine even if the files are '
+        'already present', action='store_true')
+    prep_fourier_parser.add_argument(
+        '--run_map', '-mp', help='Run map routine even if the files are '
+        'already present', action='store_true')
+    prep_fourier_parser.add_argument(
+        '--run_cl', '-cl', help='Run Cl routine even if the files are '
+        'already present', action='store_true')
+    prep_fourier_parser.add_argument(
+        '--run_cat_sims', '-cats', help='Run Cat sims routine even if the '
+        'files are already present', action='store_true')
+    prep_fourier_parser.add_argument(
+        '--run_cl_sims', '-cls', help='Run Cl sims routine even if the '
+        'files are already present', action='store_true')
+    prep_fourier_parser.add_argument(
+        '--want_plots', '-p', help='Generate plots for the images',
         action='store_true')
-    #Arguments for 'prep_real'
-    prep_real_parser.add_argument('input_folder', type=str, help='Input folder')
-    #Arguments for 'prep_fourier'
-    prep_fourier_parser.add_argument('input_path', type=str, help='Path to input files')
-    prep_fourier_parser.add_argument('--output_path', '-o', type=str, help='Path to output files')
-    prep_fourier_parser.add_argument('--run_all', '-a', help='Run all routines '
-        'even if the files are already present', action='store_true')
-    prep_fourier_parser.add_argument('--run_mask', '-mk', help='Run mask routine '
-        'even if the files are already present', action='store_true')
-    prep_fourier_parser.add_argument('--run_mult', '-m', help='Run multiplicative correction '
-        'routine even if the files are already present', action='store_true')
-    prep_fourier_parser.add_argument('--run_pz', '-pz', help='Run photo_z routine '
-        'even if the files are already present', action='store_true')
-    prep_fourier_parser.add_argument('--run_cat', '-c', help='Run catalogue routine '
-        'even if the files are already present', action='store_true')
-    prep_fourier_parser.add_argument('--run_map', '-mp', help='Run map routine '
-        'even if the files are already present', action='store_true')
-    prep_fourier_parser.add_argument('--run_cl', '-cl', help='Run Cl routine '
-        'even if the files are already present', action='store_true')
-    prep_fourier_parser.add_argument('--run_sims', '-s', help='Run Cl sims routine '
-        'even if the files are already present', action='store_true')
-    prep_fourier_parser.add_argument('--want_plots', '-p', help='Generate plots for the images',
+    prep_fourier_parser.add_argument(
+        '--remove_files', '-rp', help='Remove downloaded files',
         action='store_true')
-    prep_fourier_parser.add_argument('--remove_files', '-rp', help='Remove downloaded files',
-        action='store_true')
-    #Arguments for 'plots'
-    plots_parser.add_argument('output_path', type=str, help='Path to output files')
-    plots_parser.add_argument('--params_file', '-p', type=str, help='Path to parameter file')
-    #Arguments for 'get_kl'
+
+    # Arguments for 'plots'
+    plots_parser.add_argument(
+        'output_path', type=str, help='Path to output files')
+    plots_parser.add_argument(
+        '--params_file', '-p', type=str, help='Path to parameter file')
+
+    # Arguments for 'get_kl'
     get_kl_parser.add_argument('params_file', type=str, help='Parameters file')
 
     return parser.parse_args()
 
 
-# ------------------- Check existence -----------------------------------------#
+# ------------------- Check existence ----------------------------------------#
 
 def path_exists_or_error(path):
     """ Check if a path exists, otherwise it returns error.
@@ -111,13 +140,10 @@ def path_exists_or_error(path):
         abspath: if the file exists it returns its absolute path
 
     """
-
     abspath = os.path.abspath(path)
-
     if os.path.exists(abspath):
         return abspath
-
-    raise IOError('Path ' + abspath + ' not found!')
+    raise IOError('Path {} not found!'.format(abspath))
 
 
 def path_exists_or_create(path):
@@ -131,21 +157,18 @@ def path_exists_or_create(path):
         abspath: return the absolute path of path.
 
     """
-
     abspath = os.path.abspath(path)
     folder, name = os.path.split(abspath)
-    cond1 = not bool(re.match('.+_', name, re.IGNORECASE))
-    cond2 = not bool(re.match('.+\..{3}', name, re.IGNORECASE))
+    cond1 = not bool(re.fullmatch('.+_', name, re.IGNORECASE))
+    cond2 = not bool(re.fullmatch(r'.+\..{3}', name, re.IGNORECASE))
     if cond1 and cond2:
-        folder += '/{}'.format(name)
-
+        folder = abspath
     if not os.path.exists(folder):
         os.makedirs(folder)
-
     return folder
 
 
-# ------------------- Read ini ------------------------------------------------#
+# ------------------- Read ini -----------------------------------------------#
 
 def read_param(fname, par, type='string'):
     """ Return the value of a parameter, either from the
@@ -168,15 +191,15 @@ def read_param(fname, par, type='string'):
         for line in fn:
             line = re.sub('#.+', '', line)
             if '=' in line:
-                name , _ = line.split('=')
+                name, _ = line.split('=')
                 name = name.strip()
                 if name == par:
                     n_par = n_par + 1
-                    _ , value = line.split('=')
+                    _, value = line.split('=')
                     value = value.strip()
 
-   # If there are duplicated parameters raise an error
-    if n_par>1:
+    # If there are duplicated parameters raise an error
+    if n_par > 1:
         raise IOError('Found duplicated parameter: ' + par)
 
     # If par was not in the file use the default value
@@ -197,9 +220,9 @@ def read_param(fname, par, type='string'):
         return os.path.abspath(value)
     # Boolean type considers only the first letter (case insensitive)
     elif type == 'bool':
-        if re.match('y.+', value, re.IGNORECASE):
+        if re.match('y.*', value, re.IGNORECASE):
             return True
-        elif re.match('n.+', value, re.IGNORECASE):
+        elif re.match('n.*', value, re.IGNORECASE):
             return False
         else:
             raise IOError('Boolean type for ' + par + ' not recognized!')
@@ -209,12 +232,12 @@ def read_param(fname, par, type='string'):
     elif type == 'cosmo':
         try:
             return np.array([float(value), float(value), float(value)])
-        except:
+        except ValueError:
             try:
                 array = value.split(',')
                 array = [x.strip() for x in array]
-                return [None if x=='None' else float(x) for x in array]
-            except:
+                return [None if x == 'None' else float(x) for x in array]
+            except ValueError:
                 return value
     # All other types (such as strings) will be returned as strings
     else:
@@ -246,7 +269,7 @@ def read_cosmo_array(fname, pars):
         value = read_param(fname, par, type='cosmo')
         # Check that the parameter has the correct shape and
         # it is not a string
-        if len(value)==3 and type(value) is not str:
+        if len(value) == 3 and type(value) is not str:
             cosmo_params.append(value)
         else:
             raise IOError('Check the value of ' + par + '!')
@@ -254,7 +277,7 @@ def read_cosmo_array(fname, pars):
     return np.array(cosmo_params)
 
 
-# ------------------- FITS files ----------------------------------------------#
+# ------------------- FITS files ---------------------------------------------#
 
 def read_from_fits(fname, name):
     """ Open a fits file and read data from it.
@@ -309,11 +332,11 @@ def write_to_fits(fname, array, name, type='image', header=None):
     with fits.open(fname, mode='update') as hdul:
         try:
             hdul.__delitem__(name)
-        except:
+        except KeyError:
             pass
-        if type=='image':
+        if type == 'image':
             hdul.append(fits.ImageHDU(array, name=name, header=header))
-        elif type=='table':
+        elif type == 'table':
             hdul.append(array)
         else:
             print('Type '+type+' not recognized! Data not saved to file!')
@@ -340,7 +363,21 @@ def print_info_fits(fname):
     return
 
 
-# ------------------- On preliminary data -------------------------------------#
+def get_keys_from_fits(fname):
+    """ Get keys from fits file.
+
+    Args:
+        fname: path of the data file.
+
+    Returns:
+        list of keys.
+
+    """
+    with fits.open(fname) as fn:
+        return [x.name for x in fn]
+
+
+# ------------------- On preliminary data ------------------------------------#
 
 def unpack_simulated_xipm(fname):
     """ Unpack a tar file containing the simulated
@@ -356,7 +393,7 @@ def unpack_simulated_xipm(fname):
     """
 
     # Import local variables from settings
-    n_bins = len(set.Z_BINS)-1
+    n_bins = len(set.Z_BINS)
     n_theta = len(set.THETA_ARCMIN)
     n_fields = len(set.A_CFHTlens)
 
@@ -378,17 +415,21 @@ def unpack_simulated_xipm(fname):
             for nb1 in range(n_bins):
                 for nb2 in range(nb1, n_bins):
                     # Modify the base name to get the actual one
-                    new_name = base_name.replace('maskCLW1', 'maskCLW{0:01d}'.format(nf+1))
-                    new_name = new_name.replace('real0001', 'real{0:04d}'.format(ns+1))
-                    new_name = new_name.replace('z1_athena', 'z{0:01d}_athena'.format(nb1+1))
-                    new_name = new_name.replace('blind1_z1', 'blind1_z{0:01d}'.format(nb2+1))
-                    # For each bin pair calculate the position on the final array
-                    pos = np.flip(np.arange(n_bins+1),0)[:nb1].sum()
+                    new_name = base_name.replace('maskCLW1', 'maskCLW{0:01d}'
+                                                 ''.format(nf+1))
+                    new_name = new_name.replace('real0001', 'real{0:04d}'
+                                                ''.format(ns+1))
+                    new_name = new_name.replace('z1_athena', 'z{0:01d}_athena'
+                                                ''.format(nb1+1))
+                    new_name = new_name.replace('blind1_z1', 'blind1_z{0:01d}'
+                                                ''.format(nb2+1))
+                    # For each bin pair calculate position on the final array
+                    pos = np.flip(np.arange(n_bins+1), 0)[:nb1].sum()
                     pos = (pos + nb2 - nb1)*2*n_theta
                     # Extract file and read it only if it is not None
                     fn = np.loadtxt(fname+new_name)
                     # Read xi_plus and xi_minus and stack them
-                    xi = np.hstack((fn[:,1], fn[:,2]))
+                    xi = np.hstack((fn[:, 1], fn[:, 2]))
                     # Write imported data on final array
                     for i, xi_val in enumerate(xi):
                         xipm_sims[nf, ns, pos+i] = xi_val
@@ -415,9 +456,10 @@ def read_photo_z_data(fname):
     hdul.close()
 
     # Local variables
-    z_bins = np.array([[set.Z_BINS[n], set.Z_BINS[n+1]] for n in np.arange(len(set.Z_BINS)-1)])
-    sel_bins = np.array([set.filter_galaxies(table, z_bins[n][0], z_bins[n][1]) for n in range(len(z_bins))])
-    photo_z = np.zeros((len(z_bins)+1,len(image[0])))
+    z_bins = set.Z_BINS
+    sel_bins = np.array([set.filter_galaxies(table, z_bins[n][0], z_bins[n][1])
+                        for n in range(len(z_bins))])
+    photo_z = np.zeros((len(z_bins)+1, len(image[0])))
     n_eff = np.zeros(len(z_bins))
     sigma_g = np.zeros(len(z_bins))
     photo_z[0] = (np.arange(len(image[0]))+1./2.)*set.dZ_CFHTlens
@@ -432,11 +474,13 @@ def read_photo_z_data(fname):
         e2 = table['e2'][sel_bins[n]]-table['c2'][sel_bins[n]]/(1+m)
 
         # photo_z
-        photo_z[n+1] = np.dot(table['weight'][sel_bins[n]], image[sel_bins[n]])/w_sum
+        photo_z[n+1] = np.dot(table['weight'][sel_bins[n]],
+                              image[sel_bins[n]])/w_sum
         # n_eff
         n_eff[n] = w_sum**2/w2_sum/set.A_CFHTlens.sum()
         # sigma_g
-        sigma_g[n] = np.dot(table['weight'][sel_bins[n]]**2., (e1**2. + e2**2.)/2.)/w2_sum
+        sigma_g[n] = np.dot(table['weight'][sel_bins[n]]**2.,
+                            (e1**2. + e2**2.)/2.)/w2_sum
         sigma_g[n] = sigma_g[n]**0.5
 
         # Print progress message
@@ -444,3 +488,18 @@ def read_photo_z_data(fname):
         sys.stdout.flush()
 
     return photo_z, n_eff, sigma_g
+
+
+# ------------------- Import template Camers ---------------------------------#
+
+def import_template_Camera(path, settings):
+    ell_max = settings['ell_max']
+    nb = settings['n_bins']
+    file = np.genfromtxt(path, unpack=True)
+    rell = int(file[0].min()), int(file[0].max())
+    corr = np.zeros((ell_max+1, nb, nb))
+    triu_r, triu_c = np.triu_indices(nb)
+    for n, _ in enumerate(range(int(nb*(nb+1)/2))):
+        corr[rell[0]:rell[1]+1, triu_r[n], triu_c[n]] = file[n+1]
+        corr[rell[0]:rell[1]+1, triu_c[n], triu_r[n]] = file[n+1]
+    return corr

@@ -284,6 +284,7 @@ class BNT(object):
         self.chi = cosmo.comoving_radial_distance(1./(1.+photo_z[0]))
         self.n_i_list = photo_z[1:]
         self.nbins = len(self.n_i_list)
+        self.matrix = None
 
     def get_matrix(self):
         A_list = []
@@ -304,7 +305,13 @@ class BNT(object):
             BNT_matrix[i, i-1] = soln[0]
             BNT_matrix[i, i-2] = soln[1]
 
+        self.matrix = BNT_matrix
+
         return BNT_matrix
+
+    def save_matrix(self, fname):
+        np.savetxt(fname, self.matrix)
+        return
 
 
 def apply_bnt(cl, bnt):

@@ -12,8 +12,6 @@ Functions:
  - read_header_from_fits(fname, name)
  - write_to_fits(fname, array, name)
  - print_info_fits(fname)
- - unpack_simulated_xipm(fname)
- - read_photo_z_data(fname)
 
 """
 
@@ -46,15 +44,13 @@ def argument_parser():
     subparsers = parser.add_subparsers(
         dest='mode',
         help='Options are: '
-        '(i) prep_real: prepare data in real space. '
-        '(ii) prep_fourier: prepare data in fourier space. '
-        '(iii) run: do the actual run. '
-        '(iv) get_kl: calculate the kl transformation '
-        'Options (i) and (ii) are usually not necessary since '
-        'the data are are already stored in this repository.')
+        '(i) prep_fourier: prepare data in fourier space. '
+        '(ii) run: do the actual run. '
+        '(iii) get_kl: calculate the kl transformation '
+        'Option (i) is usually not necessary since '
+        'the data are already stored in this repository.')
 
     run_parser = subparsers.add_parser('run')
-    prep_real_parser = subparsers.add_parser('prep_real')
     prep_fourier_parser = subparsers.add_parser('prep_fourier')
     plots_parser = subparsers.add_parser('plots')
     get_kl_parser = subparsers.add_parser('get_kl')
@@ -64,10 +60,6 @@ def argument_parser():
     run_parser.add_argument(
         '--restart', '-r', help='Restart the chains from the last point '
         'of the output file (only for emcee)', action='store_true')
-
-    # Arguments for 'prep_real'
-    prep_real_parser.add_argument(
-        'input_folder', type=str, help='Input folder.')
 
     # Arguments for 'prep_fourier'
     prep_fourier_parser.add_argument(
@@ -375,119 +367,6 @@ def get_keys_from_fits(fname):
     """
     with fits.open(fname) as fn:
         return [x.name for x in fn]
-
-
-# ------------------- On preliminary data ------------------------------------#
-
-def unpack_simulated_xipm(fname):
-    """ Unpack a tar file containing the simulated
-        correlation functions and write them into
-        a single array.
-
-    Args:
-        fname: path of the input file.
-
-    Returns:
-        array with correlation functions.
-
-    """
-
-    # Import local variables from settings
-    n_bins = len(set.Z_BINS)
-    n_theta = len(set.THETA_ARCMIN)
-    n_fields = len(set.A_CFHTlens)
-
-    # Base name of each file inside the compressed tar
-    base_name = '/xipm_cfhtlens_sub2real0001_maskCLW1_blind1_z1_z1_athena.dat'
-
-    # Calculate how many simulations were run based on the number of files
-    nfiles = len(os.listdir(fname))
-    n_sims, mod = np.divmod(nfiles, n_fields*n_bins*(n_bins+1)/2)
-    if mod != 0:
-        raise IOError('The number of files in ' + fname + ' is not correct!')
-
-    # Initialize array
-    xipm_sims = np.zeros((n_fields, n_sims, 2*n_theta*n_bins*(n_bins+1)/2))
-
-    # Main loop: scroll over each file and import data
-    for nf in range(n_fields):
-        for ns in range(n_sims):
-            for nb1 in range(n_bins):
-                for nb2 in range(nb1, n_bins):
-                    # Modify the base name to get the actual one
-                    new_name = base_name.replace('maskCLW1', 'maskCLW{0:01d}'
-                                                 ''.format(nf+1))
-                    new_name = new_name.replace('real0001', 'real{0:04d}'
-                                                ''.format(ns+1))
-                    new_name = new_name.replace('z1_athena', 'z{0:01d}_athena'
-                                                ''.format(nb1+1))
-                    new_name = new_name.replace('blind1_z1', 'blind1_z{0:01d}'
-                                                ''.format(nb2+1))
-                    # For each bin pair calculate position on the final array
-                    pos = np.flip(np.arange(n_bins+1), 0)[:nb1].sum()
-                    pos = (pos + nb2 - nb1)*2*n_theta
-                    # Extract file and read it only if it is not None
-                    fn = np.loadtxt(fname+new_name)
-                    # Read xi_plus and xi_minus and stack them
-                    xi = np.hstack((fn[:, 1], fn[:, 2]))
-                    # Write imported data on final array
-                    for i, xi_val in enumerate(xi):
-                        xipm_sims[nf, ns, pos+i] = xi_val
-
-    return xipm_sims
-
-
-def read_photo_z_data(fname):
-    """ Read CFHTlens data and calculate photo_z,
-        n_eff and sigma_g.
-
-    Args:
-        fname: path of the input file.
-
-    Returns:
-        arrays with photo_z, n_eff and sigma_g.
-
-    """
-
-    # Read from fits
-    hdul = fits.open(fname, memmap=True)
-    table = hdul['data'].data
-    image = hdul['PZ_full'].data
-    hdul.close()
-
-    # Local variables
-    z_bins = set.Z_BINS
-    sel_bins = np.array([set.filter_galaxies(table, z_bins[n][0], z_bins[n][1])
-                        for n in range(len(z_bins))])
-    photo_z = np.zeros((len(z_bins)+1, len(image[0])))
-    n_eff = np.zeros(len(z_bins))
-    sigma_g = np.zeros(len(z_bins))
-    photo_z[0] = (np.arange(len(image[0]))+1./2.)*set.dZ_CFHTlens
-
-    # Main loop: for each bin calculate photo_z, n_eff and sigma_g
-    for n in range(len(z_bins)):
-        # Useful quantities TODO: Correct ellipticities
-        w_sum = table['weight'][sel_bins[n]].sum()
-        w2_sum = (table['weight'][sel_bins[n]]**2.).sum()
-        m = np.average(table['e1'][sel_bins[n]])
-        e1 = table['e1'][sel_bins[n]]/(1+m)
-        e2 = table['e2'][sel_bins[n]]-table['c2'][sel_bins[n]]/(1+m)
-
-        # photo_z
-        photo_z[n+1] = np.dot(table['weight'][sel_bins[n]],
-                              image[sel_bins[n]])/w_sum
-        # n_eff
-        n_eff[n] = w_sum**2/w2_sum/set.A_CFHTlens.sum()
-        # sigma_g
-        sigma_g[n] = np.dot(table['weight'][sel_bins[n]]**2.,
-                            (e1**2. + e2**2.)/2.)/w2_sum
-        sigma_g[n] = sigma_g[n]**0.5
-
-        # Print progress message
-        print('----> Completed bin {}/{}'.format(n+1, len(z_bins)))
-        sys.stdout.flush()
-
-    return photo_z, n_eff, sigma_g
 
 
 # ------------------- Import template Camers ---------------------------------#

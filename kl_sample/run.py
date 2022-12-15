@@ -53,7 +53,6 @@ def run(args):
     # Read and store the remaining parameters
     settings = {
         'sampler': io.read_param(path['params'], 'sampler'),
-        'space': io.read_param(path['params'], 'space'),
         'method': io.read_param(path['params'], 'method'),
         'n_sims': io.read_param(path['params'], 'n_sims'),
         'add_ia': add_ia
@@ -75,15 +74,11 @@ def run(args):
         is_diag = True
     else:
         is_diag = False
-    # Real/Fourier space settings and mcm path
-    if settings['space'] == 'real':
-        settings['ell_max'] = \
-            io.read_param(path['params'], 'ell_max', type='int')
-    elif settings['space'] == 'fourier':
-        settings['bp_ell'] = set.BANDPOWERS
-        settings['ell_max'] = settings['bp_ell'][-1, -1]
-        settings['mcm'] = io.read_param(args.params_file, 'mcm', type='path')
-        io.path_exists_or_error(settings['mcm'])
+    # Fourier space settings and mcm path
+    settings['bp_ell'] = set.BANDPOWERS
+    settings['ell_max'] = settings['bp_ell'][-1, -1]
+    settings['mcm'] = io.read_param(args.params_file, 'mcm', type='path')
+    io.path_exists_or_error(settings['mcm'])
 
     # Check if there are unused parameters.
     checks.unused_params(cosmo, settings, path)
@@ -95,19 +90,13 @@ def run(args):
     data = {
         'photo_z': io.read_from_fits(path['data'], 'photo_z')
     }
-    if settings['space'] == 'real':
-        data['theta_ell'] = np.array(set.THETA_ARCMIN)/60.  # theta in degrees
-        data['mask_theta_ell'] = set.MASK_THETA
-        data['corr_obs'] = io.read_from_fits(path['data'], 'xipm_obs')
-        data['corr_sim'] = io.read_from_fits(path['data'], 'xipm_sim')
-    elif settings['space'] == 'fourier':
-        data['theta_ell'] = io.read_from_fits(path['data'], 'ELL')
-        data['mask_theta_ell'] = set.MASK_ELL
-        cl_EE = io.read_from_fits(path['data'], 'CL_EE')
-        noise_EE = io.read_from_fits(path['data'], 'CL_EE_NOISE')
-        sims_EE = io.read_from_fits(path['data'], 'CL_SIM_EE')
-        data['corr_obs'] = rsh.clean_cl(cl_EE, noise_EE)
-        data['corr_sim'] = rsh.clean_cl(sims_EE, noise_EE)
+    data['theta_ell'] = io.read_from_fits(path['data'], 'ELL')
+    data['mask_theta_ell'] = set.MASK_ELL
+    cl_EE = io.read_from_fits(path['data'], 'CL_EE')
+    noise_EE = io.read_from_fits(path['data'], 'CL_EE_NOISE')
+    sims_EE = io.read_from_fits(path['data'], 'CL_SIM_EE')
+    data['corr_obs'] = rsh.clean_cl(cl_EE, noise_EE)
+    data['corr_sim'] = rsh.clean_cl(sims_EE, noise_EE)
     if settings['method'] in ['kl_diag', 'kl_off_diag']:
         if settings['kl_scale_dep']:
             data['kl_t'] = io.read_from_fits(path['data'], 'kl_t_ell')
@@ -154,54 +143,34 @@ def run(args):
                           settings['n_data'], settings['n_data_tot'])
     data['corr_sim'] = lkl.select_sims(data, settings)
 
-    # Prepare data if real
-    if settings['space'] == 'real':
-        # Reshape observed correlation function
-        data['corr_obs'] = rsh.flatten_xipm(data['corr_obs'], settings)
-        # Reshape simulated correlation functions
-        cs = np.empty((settings['n_fields'],
-                      settings['n_sims'])+data['corr_obs'].shape)
-        for nf in range(settings['n_fields']):
-            for ns in range(settings['n_sims']):
-                cs[nf][ns] = \
-                    rsh.flatten_xipm(data['corr_sim'][nf][ns], settings)
-        data['corr_sim'] = cs
-        # Mask observed correlation function
-        data['corr_obs'] = rsh.mask_xipm(data['corr_obs'],
-                                         data['mask_theta_ell'], settings)
-        # Compute inverse covariance matrix
-        data['inv_cov_mat'] = lkl.compute_inv_covmat(data, settings)
-
-    # Prepare data if fourier
+    # Mask Cl's
+    data['corr_obs'] = rsh.mask_cl(data['corr_obs'], is_diag=is_diag)
+    data['corr_sim'] = rsh.mask_cl(data['corr_sim'], is_diag=is_diag)
+    # Unify fields
+    data['cov_pf'] = rsh.get_covmat_cl(data['corr_sim'], is_diag=is_diag)
+    data['corr_obs'] = rsh.unify_fields_cl(data['corr_obs'],
+                                           data['cov_pf'], is_diag=is_diag,
+                                           pinv=set.PINV)
+    data['corr_sim'] = rsh.unify_fields_cl(data['corr_sim'],
+                                           data['cov_pf'], is_diag=is_diag,
+                                           pinv=set.PINV)
+    # Apply BNT if required
+    if set.BNT:
+        data['corr_obs'] = \
+            cosmo_tools.apply_bnt(data['corr_obs'], data['bnt_mat'])
+        data['corr_sim'] = \
+            cosmo_tools.apply_bnt(data['corr_sim'], data['bnt_mat'])
+    # Reshape observed Cl's
+    data['corr_obs'] = rsh.flatten_cl(data['corr_obs'], is_diag=is_diag)
+    # Calculate covmat Cl's
+    cov = rsh.get_covmat_cl(data['corr_sim'], is_diag=is_diag)
+    cov = rsh.flatten_covmat(cov, is_diag=is_diag)
+    factor = \
+        (settings['n_sims']-settings['n_data']-2.)/(settings['n_sims']-1.)
+    if set.PINV:
+        data['inv_cov_mat'] = factor*np.linalg.pinv(cov)
     else:
-        # Mask Cl's
-        data['corr_obs'] = rsh.mask_cl(data['corr_obs'], is_diag=is_diag)
-        data['corr_sim'] = rsh.mask_cl(data['corr_sim'], is_diag=is_diag)
-        # Unify fields
-        data['cov_pf'] = rsh.get_covmat_cl(data['corr_sim'], is_diag=is_diag)
-        data['corr_obs'] = rsh.unify_fields_cl(data['corr_obs'],
-                                               data['cov_pf'], is_diag=is_diag,
-                                               pinv=set.PINV)
-        data['corr_sim'] = rsh.unify_fields_cl(data['corr_sim'],
-                                               data['cov_pf'], is_diag=is_diag,
-                                               pinv=set.PINV)
-        # Apply BNT if required
-        if set.BNT:
-            data['corr_obs'] = \
-                cosmo_tools.apply_bnt(data['corr_obs'], data['bnt_mat'])
-            data['corr_sim'] = \
-                cosmo_tools.apply_bnt(data['corr_sim'], data['bnt_mat'])
-        # Reshape observed Cl's
-        data['corr_obs'] = rsh.flatten_cl(data['corr_obs'], is_diag=is_diag)
-        # Calculate covmat Cl's
-        cov = rsh.get_covmat_cl(data['corr_sim'], is_diag=is_diag)
-        cov = rsh.flatten_covmat(cov, is_diag=is_diag)
-        factor = \
-            (settings['n_sims']-settings['n_data']-2.)/(settings['n_sims']-1.)
-        if set.PINV:
-            data['inv_cov_mat'] = factor*np.linalg.pinv(cov)
-        else:
-            data['inv_cov_mat'] = factor*np.linalg.inv(cov)
+        data['inv_cov_mat'] = factor*np.linalg.inv(cov)
 
     # Import Camera's template
     if set.THEORY == 'Camera':

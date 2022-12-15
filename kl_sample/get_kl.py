@@ -39,23 +39,15 @@ def get_kl(args):
     pz = io.read_from_fits(path['data'], 'PHOTO_Z')
 
     # Read and get noise
-    if io.read_param(path['params'], 'space') == 'real':
-        ell_min = 2
-        ell_max = io.read_param(path['params'], 'ell_max', type='int')
-        n_eff = io.read_from_fits(path['data'], 'n_eff')
-        n_eff = n_eff*(180.*60./np.pi)**2.  # converted in stedrad^-1
-        sigma_g = io.read_from_fits(path['data'], 'sigma_g')
-        noise = np.array([np.diag(sigma_g**2/n_eff) for x in range(ell_max+1)])
-    elif io.read_param(path['params'], 'space') == 'fourier':
-        ell_bp = set.BANDPOWERS
-        ell_min = ell_bp[0, 0]
-        ell_max = ell_bp[-1, -1] - 1
-        noise = io.read_from_fits(path['data'], 'CL_EE_NOISE')
-        sim = io.read_from_fits(path['data'], 'CL_SIM_EE')
-        sim = rsh.clean_cl(sim, noise)
-        cov_pf = rsh.get_covmat_cl(sim)
-        noise = rsh.unify_fields_cl(noise, cov_pf, pinv=set.PINV)
-        noise = rsh.debin_cl(noise, ell_bp)
+    ell_bp = set.BANDPOWERS
+    ell_min = ell_bp[0, 0]
+    ell_max = ell_bp[-1, -1] - 1
+    noise = io.read_from_fits(path['data'], 'CL_EE_NOISE')
+    sim = io.read_from_fits(path['data'], 'CL_SIM_EE')
+    sim = rsh.clean_cl(sim, noise)
+    cov_pf = rsh.get_covmat_cl(sim)
+    noise = rsh.unify_fields_cl(noise, cov_pf, pinv=set.PINV)
+    noise = rsh.debin_cl(noise, ell_bp)
 
     # ------------------- Compute KL -----------------------------------------#
 

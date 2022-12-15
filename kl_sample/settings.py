@@ -3,7 +3,7 @@
 General settings: default variables.
 
 WARNING: if you modify this file you may
-have to rerun prep_real.py or prep_fourier.py.
+have to rerun prep_fourier.py.
 
 """
 
@@ -15,36 +15,29 @@ Z_BINS = [0.15, 0.29, 0.43, 0.57, 0.70, 0.90, 1.10, 1.30]
 # Z_BINS = [0.5,0.85,1.30]
 Z_BINS = np.vstack((Z_BINS[:-1], Z_BINS[1:])).T
 
-# Angles of the correlation functions
-THETA_ARCMIN = [1.41,  2.79,  5.53,  11.0,  21.7,  43.0,  85.2]  # in arcmin
-MASK_THETA = np.array([
-               [True,  True,  True,  True,  True,  True, False],
-               [False, False, False,  True,  True,  True,  True]
-               ])
-
-# Default settings
-# Bandpowers to calculate Cl's (minimum, maximum and intermediate bins)
-BANDPOWERS = [30, 80, 260, 450, 670, 1310, 2300, 5100]
-MASK_ELL = np.array([False,  True,  True,  True,  True,  True, False])
-KEEP_CELLS_COUPLED = False
-# Use pseudo-inverse instead of inverse.
-PINV = False
-# Theory from.
-THEORY = 'CCL'
-BNT = False
-
-# # Camera settings
+# # Default settings
 # # Bandpowers to calculate Cl's (minimum, maximum and intermediate bins)
-# BANDPOWERS = [30, 96, 110, 130, 159, 207, 237, 259, 670, 1310]
-# MASK_ELL = np.array([True, True, True, True, True, True, True, False, False])
-# KEEP_CELLS_COUPLED = True
+# BANDPOWERS = [30, 80, 260, 450, 670, 1310, 2300, 5100]
+# MASK_ELL = np.array([False,  True,  True,  True,  True,  True, False])
+# KEEP_CELLS_COUPLED = False
 # # Use pseudo-inverse instead of inverse.
-# PINV = True
+# PINV = False
 # # Theory from.
-# THEORY = 'Camera'
-# # Template file
-# CLS_TEMPLATE = 'data/Cls_template_Camera.txt'
-# BNT = True
+# THEORY = 'CCL'
+# BNT = False
+
+# Camera settings
+# Bandpowers to calculate Cl's (minimum, maximum and intermediate bins)
+BANDPOWERS = [30, 96, 110, 130, 159, 207, 237, 259, 670, 1310]
+MASK_ELL = np.array([True, True, True, True, True, True, True, False, False])
+KEEP_CELLS_COUPLED = True
+# Use pseudo-inverse instead of inverse.
+PINV = True
+# Theory from.
+THEORY = 'Camera'
+# Template file
+CLS_TEMPLATE = 'data/Cls_template_Camera.txt'
+BNT = True
 
 BANDPOWERS = np.vstack((BANDPOWERS[:-1], BANDPOWERS[1:])).T
 
@@ -132,8 +125,7 @@ default_params = {
     'sampler':        'single_point',
     'n_walkers':      10,
     'n_steps':        2,
-    'space':          'real',
-    'data':           'data/data_real.fits',
+    'data':           'data/data_fourier.fits',
     'output':         'output/test/test.txt',
     'n_threads':      2,
     'add_ia':         False

@@ -7,7 +7,6 @@ Functions:
  - get_cosmo_mask(params)
  - get_cosmo_ccl(params)
  - get_cls_ccl(params, cosmo, pz, ell_max)
- - get_xipm_ccl(cosmo, cls, theta)
 
 """
 
@@ -129,42 +128,6 @@ def get_cls_ccl(params, cosmo, pz, ell_max, add_ia=False):
     return cls
 
 
-def get_xipm_ccl(cosmo, cls, theta):
-    """ Get theory correlation function.
-
-    Args:
-        cosmo: cosmo object from CCL.
-        cls: array of cls for each pair of bins.
-        theta: array with angles for the correlation function.
-
-    Returns:
-        correlation function.
-
-    """
-
-    # Local variables
-    n_bins = cls.shape[-1]
-    n_theta = len(theta)
-    ell = np.arange(len(cls))
-
-    # Main loop: compute correlation function for each bin pair
-    xi_th = np.zeros((2, n_bins, n_bins, n_theta))
-    for c1 in range(n_bins):
-        for c2 in range(n_bins):
-            for c3 in range(n_theta):
-                xi_th[0, c1, c2, c3] = \
-                    ccl.correlation(cosmo, ell, cls[:, c1, c2], theta[c3],
-                                    corr_type='L+', method='FFTLog')
-                xi_th[1, c1, c2, c3] = \
-                    ccl.correlation(cosmo, ell, cls[:, c1, c2], theta[c3],
-                                    corr_type='L-', method='FFTLog')
-
-    # Transpose to have (pm, theta, bin1, bin2)
-    xi_th = np.transpose(xi_th, axes=[0, 3, 1, 2])
-
-    return xi_th
-
-
 # ------------------- KL related ---------------------------------------------#
 
 def get_theory(var, full, mask, data, settings):
@@ -205,8 +168,6 @@ def get_theory(var, full, mask, data, settings):
     cosmo = get_cosmo_ccl(pars)
     if set.THEORY == 'CCL':
         corr = get_cls_ccl(pars, cosmo, pz, ell_max, add_ia=settings['add_ia'])
-        if settings['space'] == 'real':
-            corr = get_xipm_ccl(cosmo, corr, theta)
     elif set.THEORY == 'Camera':
         corr = settings['cls_template']
         Om = (pars[1] + pars[2])/pars[0]**2.
@@ -237,17 +198,13 @@ def get_theory(var, full, mask, data, settings):
         is_diag = False
 
     # Reshape corr
-    if settings['space'] == 'real':
-        corr = rsh.flatten_xipm(corr, settings)
-        corr = rsh.mask_xipm(corr, data['mask_theta_ell'], settings)
-    else:
-        corr = rsh.mask_cl(corr, is_diag=is_diag)
-        corr = rsh.unify_fields_cl(corr, data['cov_pf'], is_diag=is_diag,
-                                   pinv=set.PINV)
-        # Apply BNT if required
-        if set.BNT:
-            corr = apply_bnt(corr, data['bnt_mat'])
-        corr = rsh.flatten_cl(corr, is_diag=is_diag)
+    corr = rsh.mask_cl(corr, is_diag=is_diag)
+    corr = rsh.unify_fields_cl(corr, data['cov_pf'], is_diag=is_diag,
+                               pinv=set.PINV)
+    # Apply BNT if required
+    if set.BNT:
+        corr = apply_bnt(corr, data['bnt_mat'])
+    corr = rsh.flatten_cl(corr, is_diag=is_diag)
 
     return corr
 

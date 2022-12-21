@@ -360,6 +360,12 @@ class IniFile(File):
                 out = out[0]
             else:
                 out = np.array(out)
+        # Deal with booleans
+        if type(out) is str:
+            if re.match('True', out, re.IGNORECASE):
+                out = True
+            elif re.match('False', out, re.IGNORECASE):
+                out = False
         return out
 
     def read(self, numpyfy=True):
@@ -495,20 +501,6 @@ class FitsFile(File):
             self.ext)
         return
 
-    def read_key(self, key, dtype=None):
-        """
-        Open a fits file and read a key data from it.
-
-        Args:
-            key: name of the data we want to read.
-        """
-        with fits.open(self.path) as fn:
-            if dtype:
-                self.content[key] = fn[key].data.astype(dtype)
-            else:
-                self.content[key] = fn[key].data
-        return
-
     def read(self, dtype=None):
         """ Open a fits file and read all data from it.
 
@@ -526,6 +518,19 @@ class FitsFile(File):
                 else:
                     self.content[key] = fn[key].data
         return
+
+    def read_key(self, key, dtype=None):
+        """
+        Open a fits file and read a key data from it.
+
+        Args:
+            key: name of the data we want to read.
+        """
+        with fits.open(self.path) as fn:
+            if dtype:
+                return fn[key].data.astype(dtype)
+            else:
+                return fn[key].data
 
     def get_keys(self):
         """ Get keys from fits file.

@@ -9,14 +9,19 @@ import numpy as np
 
 # CFHTlens specifications
 fields_cfhtlens = ['W'+str(x+1) for x in range(4)]
+dz_cfhtlens = 0.05
 
 # Default parameters
 default_params = {
     'cosmo': {},
     'settings': {
         'n_sims_cov': 2000,
+        'n_sims_noise': 1000,
         'z_bins': [0.15, 0.29, 0.43, 0.57, 0.70, 0.90, 1.10, 1.30],
+        'bandpowers': [30, 80, 260, 450, 670, 1310, 2300, 5100],
         'size_pix': 120,
+        'n_avg_m': 2,
+        'couple_cells_theory': True,
     },
     # 'h':              [0.61,   0.61197750,   0.81],
     # 'omega_c':        [0.001,  0.11651890,   0.99],

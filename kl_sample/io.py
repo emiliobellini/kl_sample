@@ -4,24 +4,25 @@ Module containing all the input/output related functions.
 
 Functions:
  - argument_parser()
- - path_exists_or_error(path)
- - path_exists_or_create(path)
- - read_param(fname, par, type)
- - read_cosmo_array(fname, pars)
- - read_from_fits(fname, name)
- - read_header_from_fits(fname, name)
- - write_to_fits(fname, array, name)
- - print_info_fits(fname)
+ - get_io_paths(IniFile())
+
+Classes:
+ - Path()
+ - File()
+ - IniFile()
+ - FitsFile()
 
 """
 
 import argparse
+import configparser
+import json
 import os
-import sys
 import re
+import sys
 import numpy as np
 from astropy.io import fits
-import kl_sample.settings as set
+from deepdiff import DeepDiff
 
 
 # ------------------- Parser -------------------------------------------------#
@@ -44,16 +45,50 @@ def argument_parser():
     subparsers = parser.add_subparsers(
         dest='mode',
         help='Options are: '
-        '(i) prep_fourier: prepare data in fourier space. '
+        '(i) run_preliminary: calculate observed Cls and covariance matrix. '
         '(ii) run: do the actual run. '
-        '(iii) get_kl: calculate the kl transformation '
         'Option (i) is usually not necessary since '
         'the data are already stored in this repository.')
 
     run_parser = subparsers.add_parser('run')
-    prep_fourier_parser = subparsers.add_parser('prep_fourier')
-    plots_parser = subparsers.add_parser('plots')
-    get_kl_parser = subparsers.add_parser('get_kl')
+    run_preliminary_parser = subparsers.add_parser('run_preliminary')
+
+    # Arguments for 'run_preliminary'
+    run_preliminary_parser.add_argument(
+        'params_file', type=str, help='Parameters file')
+    run_preliminary_parser.add_argument(
+        '--run_all', '-a', help='Run all routines even if the files are '
+        'already present', action='store_true')
+    run_preliminary_parser.add_argument(
+        '--run_mask', '-mk', help='Run mask routine even if the files are '
+        'already present', action='store_true')
+    run_preliminary_parser.add_argument(
+        '--run_mult', '-m', help='Run multiplicative correction routine even '
+        'if the files are already present', action='store_true')
+    run_preliminary_parser.add_argument(
+        '--run_pz', '-pz', help='Run photo_z routine even if the files are '
+        'already present', action='store_true')
+    run_preliminary_parser.add_argument(
+        '--run_cat', '-c', help='Run catalogue routine even if the files are '
+        'already present', action='store_true')
+    run_preliminary_parser.add_argument(
+        '--run_map', '-mp', help='Run map routine even if the files are '
+        'already present', action='store_true')
+    run_preliminary_parser.add_argument(
+        '--run_cl', '-cl', help='Run Cl routine even if the files are '
+        'already present', action='store_true')
+    run_preliminary_parser.add_argument(
+        '--run_cat_sims', '-cats', help='Run Cat sims routine even if the '
+        'files are already present', action='store_true')
+    run_preliminary_parser.add_argument(
+        '--run_cl_sims', '-cls', help='Run Cl sims routine even if the '
+        'files are already present', action='store_true')
+    run_preliminary_parser.add_argument(
+        '--remove_files', '-rm', action='store_true',
+        help='Remove intermediate files')
+    run_preliminary_parser.add_argument(
+        '--want_plots', '-p', action='store_true',
+        help='Save plots')
 
     # Arguments for 'run'
     run_parser.add_argument('params_file', type=str, help='Parameters file')
@@ -61,324 +96,588 @@ def argument_parser():
         '--restart', '-r', help='Restart the chains from the last point '
         'of the output file (only for emcee)', action='store_true')
 
-    # Arguments for 'prep_fourier'
-    prep_fourier_parser.add_argument(
-        'input_path', type=str, help='Input folder. Files that should contain:'
-        ' cat_full.fits, mask_arcsec_N.fits.gz (N=1,..,4), mask_url.txt. '
-        'See description in kl_sample/prep_fourier.py for more details.')
-    prep_fourier_parser.add_argument(
-        '--output_path', '-o', type=str, help='Output folder.')
-    prep_fourier_parser.add_argument(
-        '--badfields_path', '-bp', type=str, help='Folder where the bad fields'
-        ' mask are stored, or where they well be downloaded.')
-    prep_fourier_parser.add_argument(
-        '--cat_sims_path', '-cp', type=str, help='Folder where the catalogues'
-        ' of the simulations are stored, or where they well be downloaded.')
-    prep_fourier_parser.add_argument(
-        '--run_all', '-a', help='Run all routines even if the files are '
-        'already present', action='store_true')
-    prep_fourier_parser.add_argument(
-        '--run_mask', '-mk', help='Run mask routine even if the files are '
-        'already present', action='store_true')
-    prep_fourier_parser.add_argument(
-        '--run_mult', '-m', help='Run multiplicative correction routine even '
-        'if the files are already present', action='store_true')
-    prep_fourier_parser.add_argument(
-        '--run_pz', '-pz', help='Run photo_z routine even if the files are '
-        'already present', action='store_true')
-    prep_fourier_parser.add_argument(
-        '--run_cat', '-c', help='Run catalogue routine even if the files are '
-        'already present', action='store_true')
-    prep_fourier_parser.add_argument(
-        '--run_map', '-mp', help='Run map routine even if the files are '
-        'already present', action='store_true')
-    prep_fourier_parser.add_argument(
-        '--run_cl', '-cl', help='Run Cl routine even if the files are '
-        'already present', action='store_true')
-    prep_fourier_parser.add_argument(
-        '--run_cat_sims', '-cats', help='Run Cat sims routine even if the '
-        'files are already present', action='store_true')
-    prep_fourier_parser.add_argument(
-        '--run_cl_sims', '-cls', help='Run Cl sims routine even if the '
-        'files are already present', action='store_true')
-    prep_fourier_parser.add_argument(
-        '--want_plots', '-p', help='Generate plots for the images',
-        action='store_true')
-    prep_fourier_parser.add_argument(
-        '--remove_files', '-rp', help='Remove downloaded files',
-        action='store_true')
-
-    # Arguments for 'plots'
-    plots_parser.add_argument(
-        'output_path', type=str, help='Path to output files')
-    plots_parser.add_argument(
-        '--params_file', '-p', type=str, help='Path to parameter file')
-
-    # Arguments for 'get_kl'
-    get_kl_parser.add_argument('params_file', type=str, help='Parameters file')
-
     return parser.parse_args()
 
 
-# ------------------- Check existence ----------------------------------------#
+# ------------------- Path ---------------------------------------------------#
 
-def path_exists_or_error(path):
-    """ Check if a path exists, otherwise it returns error.
-
-    Args:
-        path: path to check.
-
-    Returns:
-        abspath: if the file exists it returns its absolute path
-
+class Path(object):
     """
-    abspath = os.path.abspath(path)
-    if os.path.exists(abspath):
-        return abspath
-    raise IOError('Path {} not found!'.format(abspath))
-
-
-def path_exists_or_create(path):
-    """ Check if a path exists, otherwise it creates it.
-
-    Args:
-        path: path to check. If path contains a file
-        name, it does create only the folders containing it.
-
-    Returns:
-        abspath: return the absolute path of path.
-
+    Generic class for paths.
     """
-    abspath = os.path.abspath(path)
-    folder, name = os.path.split(abspath)
-    cond1 = not bool(re.fullmatch('.+_', name, re.IGNORECASE))
-    cond2 = not bool(re.fullmatch(r'.+\..{3}', name, re.IGNORECASE))
-    if cond1 and cond2:
-        folder = abspath
-    if not os.path.exists(folder):
-        os.makedirs(folder)
-    return folder
-
-
-# ------------------- Read ini -----------------------------------------------#
-
-def read_param(fname, par, type='string'):
-    """ Return the value of a parameter, either from the
-        input file or from the default settings.
-
-    Args:
-        fname: path of the input file.
-        par: string containing the name of the parameter
-        type: output type for the value of the parameter
-
-    Returns:
-        value: value of the parameter par
-
-    """
-
-    # Read the file looking for the parameter
-    value = None
-    n_par = 0
-    with open(fname) as fn:
-        for line in fn:
-            line = re.sub('#.+', '', line)
-            if '=' in line:
-                name, _ = line.split('=')
-                name = name.strip()
-                if name == par:
-                    n_par = n_par + 1
-                    _, value = line.split('=')
-                    value = value.strip()
-
-    # If there are duplicated parameters raise an error
-    if n_par > 1:
-        raise IOError('Found duplicated parameter: ' + par)
-
-    # If par was not in the file use the default value
-    if value is None:
-        value = set.default_params[par]
-        if type == 'bool':
-            return value
-        print('Default value used for ' + par + ' = ' + str(value))
-        sys.stdout.flush()
-
-    # Convert the parameter to the desired type
-    if type == 'float':
-        return float(value)
-    elif type == 'int':
-        return int(value)
-    # Path type returns the absolute path
-    elif type == 'path':
-        return os.path.abspath(value)
-    # Boolean type considers only the first letter (case insensitive)
-    elif type == 'bool':
-        if re.match('y.*', value, re.IGNORECASE):
-            return True
-        elif re.match('n.*', value, re.IGNORECASE):
-            return False
+    def __init__(self, path=None, exists=False, check_is_folder=False):
+        # Store location
+        if path:
+            self.path = os.path.abspath(path)
+            self.parent_folder, self.fname = os.path.split(self.path)
+            self.name, self.ext = os.path.splitext(self.fname)
+            if self.ext:
+                self.isfile = True
+                self.isfolder = False
+            else:
+                self.isfile = False
+                self.isfolder = True
         else:
-            raise IOError('Boolean type for ' + par + ' not recognized!')
-    # Cosmo type has to be returned as a three dimensional array
-    # The check that it has been converted correctly is done in
-    # read_cosmo_array.
-    elif type == 'cosmo':
-        try:
-            return np.array([float(value), float(value), float(value)])
-        except ValueError:
+            self.path = None
+            self.parent_folder = None
+            self.fname = None
+            self.name = None
+            self.ext = None
+            self.isfile = None
+            self.isfolder = None
+        # Check existence
+        self.exists = os.path.exists(self.path)
+        if exists:
+            if path:
+                self.exists_or_error()
+            else:
+                raise ValueError('Can not check existence of Path. Argument '
+                                 'exists=True but path to the file '
+                                 'not provided!')
+        if check_is_folder:
+            if not self.isfolder:
+                raise ValueError('This should be a folder but it is not!')
+        return
+
+    def exists_or_error(self):
+        """
+        Check if a path exists, otherwise raise an error.
+        """
+        assert self.exists, 'File {} does not exist!'.format(self.path)
+        return
+
+    def exists_or_create(self):
+        """
+        Check if a path exists, otherwise create it.
+        If the path is a file creates an empty file,
+        if it is a folder create the folder.
+        """
+        if not os.path.exists(self.path):
+            if self.isfile:
+                if not os.path.exists(self.parent_folder):
+                    parent = Path(path=self.parent_folder)
+                    parent.exists_or_create()
+                f = open(self.path, 'w')
+                f.close()
+            elif self.isfolder:
+                os.makedirs(self.path)
+        return
+
+
+# ------------------- Generic Files ------------------------------------------#
+
+class File(Path):
+    """
+    Generic class for files.
+    """
+
+    def __init__(self, path=None, exists=False):
+        Path.__init__(self, path, exists)
+        # Check existence
+        self.exists = os.path.isfile(path)
+        # Placeholder for content
+        self.content = None
+        return
+
+    def head(self, lines=1):
+        """
+        Imitates the bash head command
+        """
+        # Check
+        self.exists_or_error()
+        # Main body
+        with open(self.path, 'r') as f:
+            f.seek(0, 2)     # go to end of file
+            total_bytes = f.tell()
+            lines_found, total_bytes_scanned = 0, 0
+            while (lines+1 > lines_found and
+                    total_bytes > total_bytes_scanned):
+                byte_block = min(1024, total_bytes-total_bytes_scanned)
+                f.seek(total_bytes_scanned, 0)
+                total_bytes_scanned += byte_block
+                lines_found += f.read(byte_block).count('\n')
+            f.seek(0, 0)
+            line_list = list(f.readlines(total_bytes_scanned))
+            line_list = [x.rstrip() for x in line_list[:lines]]
+        return line_list
+
+    def tail(self, lines=1):
+        """
+        Imitates the bash tail command
+        """
+        # Check
+        self.exists_or_error()
+        # Main body
+        with open(self.path, 'r') as f:
+            f.seek(0, 2)     # go to end of file
+            total_bytes = f.tell()
+            lines_found, total_bytes_scanned = 0, 0
+            while (lines+1 > lines_found and
+                    total_bytes > total_bytes_scanned):
+                byte_block = min(1024, total_bytes-total_bytes_scanned)
+                f.seek(total_bytes-total_bytes_scanned-byte_block, 0)
+                lines_found += f.read(byte_block).count('\n')
+                total_bytes_scanned += byte_block
+            f.seek(total_bytes-total_bytes_scanned, 0)
+            line_list = list(f.readlines())
+            line_list = [x.rstrip() for x in line_list[-lines:]]
+        return line_list
+
+    def read(self, size=-1):
+        """
+        Read the file.
+        """
+        # Check
+        self.exists_or_error()
+        # Main body
+        with open(self.path, 'r') as f:
+            content = f.read(size)
+        self.content = content
+        return content
+
+    def readlines(self, size=-1):
+        """
+        Read each line of the file.
+        """
+        with open(self.path, 'r') as f:
+            lines = f.readlines(size)
+        return lines
+
+    def read_header(self, comments='#'):
+        """
+        Read the header of a file, i.e. from the beginning of the file
+        all lines that start with the comments symbol.
+        """
+        # Check
+        self.exists_or_error()
+        # Comment string
+        if type(comments) is str:
+            comments = [comments]
+        assert type(comments) is list, 'Wrong format for comments '\
+            'in File.read_header(). It should be a list, got {}!'\
+            ''.format(type(comments))
+        # Main body
+        is_head = True
+        head = []
+        f = open(self.path, 'r')
+        ln = f.readline()
+        while ln and is_head:
+            if any([re.match('{}.*'.format(x), ln) for x in comments]):
+                head.append(ln)
+            else:
+                is_head = False
+            ln = f.readline()
+        f.close()
+        head = ''.join(head)
+        return head
+
+    def write(self, content=None, path=None, overwrite=False):
+        """
+        Write the string 'content' into the file.
+        """
+        if not path:
+            path = self.path
+        if not content:
+            content = self.content
+        # Check
+        assert path, 'To write a file you should specify a path'
+        assert content, 'No content to write'
+        if not overwrite and self.exists:
+            raise IOError('File {} exists, if you really want to overwrite '
+                          'it, use overwrite argument.'.format(path))
+        # Main body
+        with open(path, 'w') as f:
+            f.write(content)
+        print('--> File saved at {}!'.format(path))
+        return
+
+    def append(self, content=None, path=None):
+        """
+        Append the string 'content' into the file.
+        """
+        if not path:
+            path = self.path
+        if not content:
+            content = self.content
+        # Check
+        assert path, 'To write a file you should specify a path'
+        assert content, 'No content to write'
+        if not self.exists:
+            raise IOError('Can not append to file {}, since it does not '
+                          'exists. Use write if you want to create it.'
+                          ''.format(path))
+        # Main body
+        with open(path, 'a') as f:
+            f.write(content)
+        print('--> Content appended to file at {}!'.format(path))
+        return
+
+    def remove(self):
+        """
+        Remove file and reinitialize the class
+        """
+        os.remove(self.path)
+        self.__init__(self.path)
+        return
+
+
+# ------------------- Ini Files ----------------------------------------------#
+
+class IniFile(File):
+    """
+    Class for ini files.
+    The codified structure is the one of the configparser module.
+    Ini files can be divided into different sections or not.
+    Both keys and values are read as strings by default.
+    """
+
+    def __init__(self, path=None, exists=False):
+        File.__init__(self, path, exists)
+        # Name of the top section (see read)
+        self.top_section = 'top'
+        # Check is ini
+        assert self.ext == '.ini', 'Expected .ini file, found {}'.format(
+            self.ext)
+        return
+
+    def _numpyfy(self, value):
+        """
+        Try to convert all values to numpy arrays and floats.
+        """
+        out = value
+        if type(out) is str:
+            out = out.split(',')
+            if type(out) is not list:
+                out = [out]
+            if type(out[0]) is str:
+                out = [x.strip() for x in out]
+            for n, elem in enumerate(out):
+                try:
+                    out[n] = float(elem)
+                except ValueError:
+                    pass
+            if len(out) == 1:
+                out = out[0]
+            else:
+                out = np.array(out)
+        return out
+
+    def read(self, numpyfy=True):
+        """
+        Read the ini file and store the content. It manually creates a
+        top section to store all the content at the beginning of the file
+        (this allows to have a ini file without sections).
+        """
+        # Check
+        self.exists_or_error()
+        # Main body
+        config = configparser.ConfigParser(
+            inline_comment_prefixes=('#', ';'),
+            empty_lines_in_values=False
+        )
+        config.optionxform = str
+        with open(self.path) as fn:
+            u = '[{}]\n'.format(self.top_section) + fn.read()
             try:
-                array = value.split(',')
-                array = [x.strip() for x in array]
-                return [None if x == 'None' else float(x) for x in array]
-            except ValueError:
-                return value
-    # All other types (such as strings) will be returned as strings
-    else:
+                config.read_string(u)
+            except TypeError:  # Added for compatibility with Python2
+                config.read_string(unicode(u))  # noqa: F821
+        self.content = json.loads(json.dumps(config._sections))
+        if numpyfy:
+            for sec in self.content:
+                for key in self.content[sec]:
+                    self.content[sec][key] = \
+                        self._numpyfy(self.content[sec][key])
+        return
+
+    def read_section(self, section=None):
+        """
+        Read a specific section of the ini file (in reality it reads all
+        the file, but returns only the section wanted. Ini files are usually
+        not too large, change this if you need more performance). If the
+        section does not exists, it silently returns an empty dictionary.
+        """
+        # Check
+        self.exists_or_error()
+        # Main body
+        if not self.content:
+            self.read()
+        if section:
+            sec = section
+        else:
+            sec = self.top_section
+        # Try to read the section
+        try:
+            return self.content[sec]
+        except KeyError:
+            return dict()
+
+    def read_param(self, name, section, default=None, numpyfy=True):
+        """
+        Given its name and section read a parameter and,
+        if not present, use default value.
+        """
+        if not self.content:
+            self.read()
+        try:
+            value = self.content[section][name]
+        except KeyError:
+            value = default[section][name]
+        if numpyfy:
+            value = self._numpyfy(value)
         return value
 
+    def write(self, content=None, path=None, overwrite=False, header=None):
+        """
+        Write a dictionary to a file (path).
+        It is possible either to specify a dictionary to write (content),
+        or by default it writes the saved parameters.
+        """
+        if not path:
+            path = self.path
+        if not content:
+            content = self.content
+        # Check
+        assert path, 'To write a file you should specify a path'
+        assert content, 'No content to write'
+        if not overwrite and self.exists:
+            raise IOError('File {} exists, if you really want to overwrite '
+                          'it, use overwrite argument.'.format(path))
+        # Main body
+        secs = list(content.keys())
+        for sec in secs:
+            if not content[sec]:
+                content.pop(sec)
+            else:
+                for key in content[sec].keys():
+                    if type(content[sec][key]) == np.ndarray:
+                        content[sec][key] = \
+                            ', '.join([str(x) for x in content[sec][key]])
+                    elif type(content[sec][key]) == float:
+                        content[sec][key] = str(content[sec][key])
+        config = configparser.ConfigParser()
+        config.optionxform = str  # Preserve case
+        config.read_dict(content)
+        with open(path, 'w') as configfile:
+            config.write(configfile)
+        # Write header
+        if header:
+            with open(path, 'r+') as file:
+                content = file.read()
+                file.seek(0)
+                file.write(header + content)
+        print('--> File saved at {}!'.format(path))
+        return
 
-def read_cosmo_array(fname, pars):
-    """ Read from the parameter file the cosmological
-        parameters and store them in an array.
+    def get_diffs(self, other):
+        """
+        Return True/False if two ini files are equal or not.
+        """
+        diffs = DeepDiff(self.content, other.content)
+        return diffs
 
-    Args:
-        fname: path of the input file.
-        pars: list of the cosmological parameters. Used
-        to determine the order in which they are stored
 
-    Returns:
-        cosmo_params: array containing the cosmological
-        parameters. Each parameter is a row as
-        [left_bound, central, right_bound].
+# ------------------- Ini Files ----------------------------------------------#
 
+class FitsFile(File):
+    """
+    Class for fits files.
     """
 
-    # Initialize the array
-    cosmo_params = []
-    # Run over the parameters and append them
-    # to the array
-    for n, par in enumerate(pars):
-        # Get the values of the parameter
-        value = read_param(fname, par, type='cosmo')
-        # Check that the parameter has the correct shape and
-        # it is not a string
-        if len(value) == 3 and type(value) is not str:
-            cosmo_params.append(value)
-        else:
-            raise IOError('Check the value of ' + par + '!')
+    def __init__(self, path=None, exists=False):
+        File.__init__(self, path, exists)
+        # Placeholder for content
+        self.content = {}
+        # Check is fits
+        test1 = self.ext == '.fits'
+        test2 = self.ext == '.gz' and os.path.splitext(self.name)[1] == '.fits'
+        assert test1 or test2, 'Expected .fits file, found {}'.format(
+            self.ext)
+        return
 
-    return np.array(cosmo_params)
+    def read_key(self, key, dtype=None):
+        """
+        Open a fits file and read a key data from it.
 
+        Args:
+            key: name of the data we want to read.
+        """
+        with fits.open(self.path) as fn:
+            if dtype:
+                self.content[key] = fn[key].data.astype(dtype)
+            else:
+                self.content[key] = fn[key].data
+        return
 
-# ------------------- FITS files ---------------------------------------------#
+    def read(self, dtype=None):
+        """ Open a fits file and read all data from it.
 
-def read_from_fits(fname, name):
-    """ Open a fits file and read data from it.
+        Args:
+            key: name of the data we want to read.
 
-    Args:
-        fname: path of the data file.
-        name: name of the data we want to extract.
+        Returns:
+            array with data for name.
 
-    Returns:
-        array with data for name.
+        """
+        with fits.open(self.path) as fn:
+            for key in fn:
+                if dtype:
+                    self.content[key] = fn[key].data.astype(dtype)
+                else:
+                    self.content[key] = fn[key].data
+        return
 
-    """
-    with fits.open(fname) as fn:
-        return fn[name].data
+    def get_keys(self):
+        """ Get keys from fits file.
 
+        Args:
+            fname: path of the data file.
 
-def read_header_from_fits(fname, name):
-    """ Open a fits file and read header from it.
+        Returns:
+            list of keys.
 
-    Args:
-        fname: path of the data file.
-        name: name of the data we want to extract.
+        """
+        with fits.open(self.path) as fn:
+            return [x.name for x in fn]
 
-    Returns:
-        header.
+    def get_header(self, name):
+        """ Open a fits file and read header from it.
 
-    """
-    with fits.open(fname) as fn:
-        return fn[name].header
+        Args:
+            fname: path of the data file.
+            name: name of the data we want to extract.
 
+        Returns:
+            header.
 
-def write_to_fits(fname, array, name, type='image', header=None):
-    """ Write an array to a fits file.
+        """
+        with fits.open(self.path) as fn:
+            return fn[name].header
 
-    Args:
-        fname: path of the input file.
-        array: array to save.
-        name: name of the image.
+    def write(self, array, name, type='image', header=None):
+        """ Write an array to a fits file.
 
-    Returns:
-        None
+        Args:
+            fname: path of the input file.
+            array: array to save.
+            name: name of the image.
 
-    """
+        Returns:
+            None
 
-    warning = False
+        """
 
-    # If file does not exist, create it
-    if not os.path.exists(fname):
-        hdul = fits.HDUList([fits.PrimaryHDU()])
-        hdul.writeto(fname)
-    # Open the file
-    with fits.open(fname, mode='update') as hdul:
-        try:
-            hdul.__delitem__(name)
-        except KeyError:
-            pass
-        if type == 'image':
-            hdul.append(fits.ImageHDU(array, name=name, header=header))
-        elif type == 'table':
-            hdul.append(array)
-        else:
-            print('Type '+type+' not recognized! Data not saved to file!')
-            return True
-    print('Appended ' + name.upper() + ' to ' + os.path.relpath(fname))
-    sys.stdout.flush()
-    return warning
+        warning = False
 
-
-def print_info_fits(fname):
-    """ Print on screen fits file info.
-
-    Args:
-        fname: path of the input file.
-
-    Returns:
-        None
-
-    """
-
-    with fits.open(fname) as hdul:
-        print(hdul.info())
+        # If file does not exist, create it
+        if not os.path.exists(self.path):
+            hdul = fits.HDUList([fits.PrimaryHDU()])
+            hdul.writeto(self.path)
+        # Open the file
+        with fits.open(self.path, mode='update') as hdul:
+            try:
+                hdul.__delitem__(name)
+            except KeyError:
+                pass
+            if type == 'image':
+                hdul.append(fits.ImageHDU(array, name=name, header=header))
+            elif type == 'table':
+                hdul.append(array)
+            else:
+                print('Type '+type+' not recognized! Data not saved to file!')
+                return True
+        print('Appended ' + name.upper() + ' to ' + os.path.relpath(self.path))
         sys.stdout.flush()
-    return
+        return warning
+
+    def print_info(self):
+        """ Print on screen fits file info.
+
+        Args:
+            fname: path of the input file.
+
+        Returns:
+            None
+
+        """
+
+        with fits.open(self.path) as hdul:
+            print(hdul.info())
+            sys.stdout.flush()
+        return
 
 
-def get_keys_from_fits(fname):
-    """ Get keys from fits file.
+# ------------------- I/O Paths ----------------------------------------------#
+
+def get_io_paths(ini, fields, want_plots=False):
+    """
+    Get paths for input and output.
 
     Args:
-        fname: path of the data file.
+        ini: IniFile
+        fields: list of the observed fields.
 
     Returns:
-        list of keys.
+        path: dictionary with all the necessary paths.
 
     """
-    with fits.open(fname) as fn:
-        return [x.name for x in fn]
 
+    # Define local variables
+    join = os.path.join
+    paths = {}
 
-# ------------------- Import template Camers ---------------------------------#
+    # Raw data
+    try:
+        raw = ini.content['paths']['raw_data']
+    except KeyError:
+        raise KeyError('In your ini file you should have a raw_data folder')
+    paths['raw_data'] = Path(path=raw, check_is_folder=True)
+    paths['cat_full'] = FitsFile(path=join(raw, 'cat_full.fits'))
+    paths['mask_url'] = File(path=join(raw, 'mask_url.txt'))
+    for f in fields:
+        paths['mask_sec_'+f] = FitsFile(
+            path=join(raw, 'mask_arcsec_{}.fits.gz'.format(f)))
+    # Check existence
+    for name in paths:
+        paths[name].exists_or_error()
 
-def import_template_Camera(path, settings):
-    ell_max = settings['ell_max']
-    nb = settings['n_bins']
-    file = np.genfromtxt(path, unpack=True)
-    rell = int(file[0].min()), int(file[0].max())
-    corr = np.zeros((ell_max+1, nb, nb))
-    triu_r, triu_c = np.triu_indices(nb)
-    for n, _ in enumerate(range(int(nb*(nb+1)/2))):
-        corr[rell[0]:rell[1]+1, triu_r[n], triu_c[n]] = file[n+1]
-        corr[rell[0]:rell[1]+1, triu_c[n], triu_r[n]] = file[n+1]
-    return corr
+    # Processed data
+    try:
+        proc = ini.content['paths']['processed_data']
+    except KeyError:
+        raise KeyError(
+            'In your ini file you should have a processed_data folder')
+    paths['processed_data'] = Path(path=proc, check_is_folder=True)
+    paths['badfields'] = Path(path=join(proc, 'badfields'),
+                              check_is_folder=True)
+    paths['mcm'] = Path(path=join(proc, 'mcm'))
+    paths['data'] = FitsFile(path=join(proc, 'data.fits'))
+    paths['photo_z'] = FitsFile(path=join(proc, 'photo_z.fits'))
+    paths['processed_ini'] = IniFile(path=join(proc, 'parameters.ini'))
+    try:
+        sims = ini.content['paths']['simulations_catalogues']
+    except KeyError:
+        sims = ''
+    if sims:
+        paths['cat_sims'] = Path(path=sims)
+    else:
+        paths['cat_sims'] = Path(path=join(proc, 'cat_sims'))
+    for f in fields:
+        paths['mask_'+f] = FitsFile(path=join(proc, 'mask_{}.fits'.format(f)))
+        paths['mult_'+f] = FitsFile(path=join(proc, 'mult_{}.fits'.format(f)))
+        paths['cat_'+f] = FitsFile(path=join(proc, 'cat_{}.fits'.format(f)))
+        paths['map_'+f] = FitsFile(path=join(proc, 'map_{}.fits'.format(f)))
+        paths['cl_'+f] = FitsFile(path=join(proc, 'cl_{}.fits'.format(f)))
+        paths['cl_sims_'+f] = \
+            FitsFile(path=join(proc, 'cl_sims_{}.fits'.format(f)))
+
+    # Plots
+    if want_plots:
+        paths['plots'] = Path(path=join(proc, 'plots'), check_is_folder=True)
+
+    # Create folders
+    for name in paths:
+        if paths[name].isfolder:
+            paths[name].exists_or_create()
+
+    return paths

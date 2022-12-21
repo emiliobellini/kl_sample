@@ -1,12 +1,15 @@
 """
 kl_sample: a code that sample cosmological parameters using
-lensing data (for now CFHTlens). It performs a KL transform
-to compress data. There are three main modules:
-a - prep_fourier: prepare data in fourier space and store
-    them inside the repository. Once they are there it is
-    no longer needed to rerun it;
-b - run: given the data (either in real or fourier space)
-    and some additional input parameter do the actual run.
+lensing data (for now CFHTlens). If requested, it performs
+a KL transform to compress data and/or a BNT transform.
+There are two main modules:
+a - run_preliminary: calculate observed Cl's and covariance
+    matrix using CFHTlens data and gaussian simulations. It
+    stores the output in a fits file. Once created the file
+    it is no longer needed to run this module (unless some
+    setting is changed);
+b - run: given the observed Cl's and covariance matrix sample
+    the theory parameter space.
     Implemented samplers: emcee or single_point
 """
 
@@ -20,15 +23,9 @@ if __name__ == '__main__':
     args = argument_parser()
 
     # Redirect the run to the correct module
-    if args.mode == 'prep_fourier':
-        from kl_sample.prep_fourier import prep_fourier
-        sys.exit(prep_fourier(args))
-    if args.mode == 'plots':
-        from kl_sample.plots import plots
-        sys.exit(plots(args))
-    if args.mode == 'run':
-        from kl_sample.run import run
-        sys.exit(run(args))
-    if args.mode == 'get_kl':
-        from kl_sample.get_kl import get_kl
-        sys.exit(get_kl(args))
+    if args.mode == 'run_preliminary':
+        from kl_sample.run_preliminary import run_preliminary
+        sys.exit(run_preliminary(args))
+    # if args.mode == 'run':
+    #     from kl_sample.run import run
+    #     sys.exit(run(args))

@@ -340,35 +340,14 @@ class IniFile(File):
             self.ext)
         return
 
-    def _numpyfy(self, value):
-        """
-        Try to convert all values to numpy arrays and floats.
-        """
-        out = value
-        if type(out) is str:
-            out = out.split(',')
-            if type(out) is not list:
-                out = [out]
-            if type(out[0]) is str:
-                out = [x.strip() for x in out]
-            for n, elem in enumerate(out):
-                try:
-                    out[n] = float(elem)
-                except ValueError:
-                    pass
-            if len(out) == 1:
-                out = out[0]
-            else:
-                out = np.array(out)
-        # Deal with booleans
-        if type(out) is str:
-            if re.match('True', out, re.IGNORECASE):
-                out = True
-            elif re.match('False', out, re.IGNORECASE):
-                out = False
-        return out
+    def _bool(self, value):
+        if re.match('True', value, re.IGNORECASE):
+            value = True
+        elif re.match('False', value, re.IGNORECASE):
+            value = False
+        return value
 
-    def read(self, numpyfy=True):
+    def read(self):
         """
         Read the ini file and store the content. It manually creates a
         top section to store all the content at the beginning of the file
@@ -389,11 +368,6 @@ class IniFile(File):
             except TypeError:  # Added for compatibility with Python2
                 config.read_string(unicode(u))  # noqa: F821
         self.content = json.loads(json.dumps(config._sections))
-        if numpyfy:
-            for sec in self.content:
-                for key in self.content[sec]:
-                    self.content[sec][key] = \
-                        self._numpyfy(self.content[sec][key])
         return
 
     def read_section(self, section=None):
@@ -418,10 +392,19 @@ class IniFile(File):
         except KeyError:
             return dict()
 
-    def read_param(self, name, section, default=None, numpyfy=True):
+    def read_param(self, name, section, type='string', default=None):
         """
         Given its name and section read a parameter and,
         if not present, use default value.
+        Types implemented:
+         - string
+         - int
+         - float
+         - bool
+         - list_of_strings
+         - list_of_ints
+         - list_of_floats
+         - list_of_bools
         """
         if not self.content:
             self.read()
@@ -429,8 +412,24 @@ class IniFile(File):
             value = self.content[section][name]
         except KeyError:
             value = default[section][name]
-        if numpyfy:
-            value = self._numpyfy(value)
+        # Convert
+        if type == 'string':
+            value = str(value)
+        elif type == 'int':
+            value = int(value)
+        elif type == 'float':
+            value = float(value)
+        elif type == 'bool':
+            value = self._bool(value)
+        elif re.match('list_.+', type):
+            value = value.split(',')
+            value = [x.strip() for x in value]
+            if type == 'list_of_ints':
+                value = [int(x) for x in value]
+            elif type == 'list_of_floats':
+                value = [float(x) for x in value]
+            elif type == 'list_of_bools':
+                value = [self._bool(x) for x in value]
         return value
 
     def write(self, content=None, path=None, overwrite=False, header=None):

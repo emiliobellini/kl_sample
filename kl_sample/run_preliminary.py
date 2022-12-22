@@ -48,25 +48,27 @@ def run_preliminary(args):
 
     warning = False  # Global variable collecting warnings
     # List of CFHTlens fields
-    fields = ini.read_param('fields_cfhtlens', 'cfhtlens')
+    fields = ini.read_param('fields_cfhtlens', 'cfhtlens',
+                            type='list_of_strings')
     # Number of simulations used to calculate the covariance matrix
-    n_sims_cov = int(ini.read_param('n_sims_cov', 'settings'))
+    n_sims_cov = ini.read_param('n_sims_cov', 'settings', type='int')
     # Number of simulations used to calculate the noise
-    n_sims_noise = \
-        int(ini.read_param('n_sims_noise', 'settings'))
+    n_sims_noise = ini.read_param('n_sims_noise', 'settings', type='int')
     # List of redshift bins
-    z_bins = ini.read_param('z_bins', 'settings')
+    z_bins = ini.read_param('z_bins', 'settings', type='list_of_floats')
     z_bins = np.vstack((z_bins[:-1], z_bins[1:])).T
     # Size pixels masks in arcsecs (it has to be an integer number)
-    size_pix = int(ini.read_param('size_pix', 'settings'))
+    size_pix = ini.read_param('size_pix', 'settings', type='int')
     # Range of pixels used to average the multiplicative correction
-    n_avg_m = int(ini.read_param('n_avg_m', 'settings'))
+    n_avg_m = ini.read_param('n_avg_m', 'settings', type='int')
     # Bandpowers to calculate Cl's
-    bandpowers = ini.read_param('bandpowers', 'settings')
+    bandpowers = ini.read_param('bandpowers', 'settings',
+                                type='list_of_floats')
     bandpowers = np.vstack((bandpowers[:-1], bandpowers[1:])).T
     # Use mode coupling matrix to couple theoretical Cells
     # (otherwise decouple observations)
-    couple_cells_theory = ini.read_param('couple_cells_theory', 'settings')
+    couple_cells_theory = ini.read_param('couple_cells_theory', 'settings',
+                                         type='bool')
 
     # ----------- Initialize -------------------------------------------------#
 

@@ -8,55 +8,18 @@ have to rerun run_preliminary.py.
 import numpy as np
 
 # CFHTlens specifications
-fields_cfhtlens = ['W'+str(x+1) for x in range(4)]
 dz_cfhtlens = 0.05
-
-# Default parameters
-default_params = {
-    'cosmo': {},
-    'settings': {
-        'n_sims_cov': 2000,
-        'n_sims_noise': 1000,
-        'z_bins': [0.15, 0.29, 0.43, 0.57, 0.70, 0.90, 1.10, 1.30],
-        'bandpowers': [30, 80, 260, 450, 670, 1310, 2300, 5100],
-        'size_pix': 120,
-        'n_avg_m': 2,
-        'couple_cells_theory': True,
-    },
-    # 'h':              [0.61,   0.61197750,   0.81],
-    # 'omega_c':        [0.001,  0.11651890,   0.99],
-    # 'omega_b':        [0.013,  0.03274485,   0.033],
-    # 'ln10_A_s':       [2.3,    2.47363700,   5.0],
-    # 'n_s':            [0.7,    1.25771300,   1.3],
-    # 'w_0':            [-3.0,   -1.00000000,  0.0],
-    # 'w_A':            [-5.0,   0.00000000,   5.0],
-    # 'A_IA':           [-6.0,   0.00000000,   6.0],
-    # 'beta_IA':        [0.25,   1.13000000,   0.25],
-    # 'ell_max':        2000,
-    # 'method':         'full',
-    # 'n_kl':           len(Z_BINS),
-    # 'kl_scale_dep':   False,
-    # 'n_sims':         'auto',
-    # 'sampler':        'single_point',
-    # 'n_walkers':      10,
-    # 'n_steps':        2,
-    # 'data':           'data/data_fourier.fits',
-    # 'output':         'output/test/test.txt',
-    # 'n_threads':      2,
-    # 'add_ia':         False,
-}
 
 
 # Criteria used to select the data
-def filter_galaxies(data, z_min, z_max, field='all'):
+def filter_galaxies(data, z_min, z_max, field):
     sel = data['Z_B'] >= z_min
     sel = (data['Z_B'] < z_max)*sel
     sel = (data['MASK'] == 0)*sel
     sel = (data['weight'] > 0.)*sel
     sel = (data['star_flag'] == 0)*sel
     sel = np.array([x[:6] in good_fit_patterns for x in data['id']])*sel
-    if field in fields_cfhtlens:
-        sel = np.array([x[:2] in field for x in data['id']])*sel
+    sel = np.array([x[:2] in field for x in data['id']])*sel
     return sel
 
 

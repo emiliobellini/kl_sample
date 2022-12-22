@@ -47,27 +47,26 @@ def run_preliminary(args):
     # ----------- Define local variables -------------------------------------#
 
     warning = False  # Global variable collecting warnings
-    fields = setts.fields_cfhtlens  # List of CFHTlens fields
-    default = setts.default_params  # Dictionary with of default parameters
+    # List of CFHTlens fields
+    fields = ini.read_param('fields_cfhtlens', 'cfhtlens')
     # Number of simulations used to calculate the covariance matrix
-    n_sims_cov = int(ini.read_param('n_sims_cov', 'settings', default=default))
+    n_sims_cov = int(ini.read_param('n_sims_cov', 'settings'))
     # Number of simulations used to calculate the noise
     n_sims_noise = \
-        int(ini.read_param('n_sims_noise', 'settings', default=default))
+        int(ini.read_param('n_sims_noise', 'settings'))
     # List of redshift bins
-    z_bins = ini.read_param('z_bins', 'settings', default=default)
+    z_bins = ini.read_param('z_bins', 'settings')
     z_bins = np.vstack((z_bins[:-1], z_bins[1:])).T
     # Size pixels masks in arcsecs (it has to be an integer number)
-    size_pix = int(ini.read_param('size_pix', 'settings', default=default))
+    size_pix = int(ini.read_param('size_pix', 'settings'))
     # Range of pixels used to average the multiplicative correction
-    n_avg_m = int(ini.read_param('n_avg_m', 'settings', default=default))
+    n_avg_m = int(ini.read_param('n_avg_m', 'settings'))
     # Bandpowers to calculate Cl's
-    bandpowers = ini.read_param('bandpowers', 'settings', default=default)
+    bandpowers = ini.read_param('bandpowers', 'settings')
     bandpowers = np.vstack((bandpowers[:-1], bandpowers[1:])).T
     # Use mode coupling matrix to couple theoretical Cells
     # (otherwise decouple observations)
-    couple_cells_theory = \
-        ini.read_param('couple_cells_theory', 'settings', default=default)
+    couple_cells_theory = ini.read_param('couple_cells_theory', 'settings')
 
     # ----------- Initialize -------------------------------------------------#
 
@@ -77,12 +76,15 @@ def run_preliminary(args):
     is_run, warning = is_run_and_check(args, fields, paths, n_sims_cov)
 
     # Compare ini files
-    # TODO: if ini does not exist put processed data are there throw error
     if paths['processed_ini'].exists:
         paths['processed_ini'].read()
         diffs = ini.get_diffs(paths['processed_ini'])
         if diffs:
-            raise IOError('Ini files are different! Skipping the calculation!')
+            raise IOError('Ini files are different! Quitting the calculation!')
+    elif not all(is_run.values()):
+        raise IOError('Some processed data were found in the folder, but '
+                      'without an ini file. It is safer to quit the '
+                      'calculation!')
     else:
         msg = '# This is an automatically generated file. It can be\n'\
               '# used for a new run, but also to check the consistency\n'\
@@ -623,7 +625,7 @@ def run_mask(paths, fields, z_bins, size_pix, remove_files, want_plots):
             weights_mask = np.zeros(mask.shape)
 
             # Filter galaxies
-            sel = setts.filter_galaxies(cat, z_bin[0], z_bin[1], field=f)
+            sel = setts.filter_galaxies(cat, z_bin[0], z_bin[1], f)
             gals = cat[sel]
             # Get World position of each galaxy
             pos = np.vstack((gals['ALPHA_J2000'], gals['DELTA_J2000'])).T
@@ -743,7 +745,7 @@ def run_mult(paths, fields, z_bins, n_avg_m, want_plots):
             # Create an empty array for the multiplicative correction
             mult_corr = np.zeros(mask.shape)
             # Filter galaxies
-            filter = setts.filter_galaxies(cat, z_bin[0], z_bin[1], field=f)
+            filter = setts.filter_galaxies(cat, z_bin[0], z_bin[1], f)
             gals = cat[filter]
             # Get World position of each galaxy
             pos = np.vstack((gals['ALPHA_J2000'], gals['DELTA_J2000'])).T
@@ -888,7 +890,7 @@ def run_photo_z(paths, fields, z_bins, size_pix, want_plots):
     for f in fields:
         filter[f] = {}
         for n_z_bin, z_bin in enumerate(z_bins):
-            filt = setts.filter_galaxies(cat, z_bin[0], z_bin[1], field=f)
+            filt = setts.filter_galaxies(cat, z_bin[0], z_bin[1], f)
             pix = np.transpose(
                 [cat[filt]['ALPHA_J2000'], cat[filt]['DELTA_J2000']])
             pix = w[f].wcs_world2pix(pix, 0).astype(int)
@@ -1101,7 +1103,7 @@ def run_cat(paths, fields, z_bins):
             w = wcs.WCS(hd)
 
             # Filter galaxies
-            filter = setts.filter_galaxies(cat, z_bin[0], z_bin[1], field=f)
+            filter = setts.filter_galaxies(cat, z_bin[0], z_bin[1], f)
             gals = cat[filter]
 
             # Calculate corrected ellipticities
@@ -1437,6 +1439,8 @@ def run_cat_sims(paths, fields, z_bins, n_sims_cov):
         ny, nx = masks[0].shape
         lx = np.fabs(np.radians(nx*ww.wcs.cdelt[0]))
         ly = np.fabs(np.radians(ny*ww.wcs.cdelt[1]))
+        print('lx = {}'.format(lx))  # REMOVE
+        print('ly = {}'.format(ly))  # REMOVE
 
         maps = nmt.synfast_flat(nx, ny, lx, ly, clarr, sparr,
                                 seed=seed).reshape([n_bins, 2, ny, nx])
